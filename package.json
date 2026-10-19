@@ -1,0 +1,21 @@
+{
+  "name": "dvlive-runner",
+  "version": "1.0.0",
+  "description": "DV Live web show engine API reference runner",
+  "license": "ISC",
+  "type": "commonjs",
+  "main": "run.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node run.js",
+    "help": "node run.js help",
+    "getShowVoteChoice": "node run.js getShowVoteChoice",
+    "getShowVote": "node run.js getShowVote",
+    "createVoter": "node run.js createVoter",
+    "getVoter": "node run.js getVoter",
+    "addVote": "node run.js addVote",
+    "castVote": "node run.js castVote"
+  }
+}

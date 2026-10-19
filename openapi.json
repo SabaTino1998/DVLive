@@ -1,0 +1,1116 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "DVLive web show engine",
+        "description": "API du moteur de shows DV Live (votes, participants, ...).",
+        "version": "1.0.0"
+    },
+    "paths": {
+        "/show-vote-choice/{uuid}": {
+            "get": {
+                "tags": [
+                    "Show Vote Choices"
+                ],
+                "summary": "description",
+                "operationId": "get_show_vote_choice",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Show vote choice UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Show vote choice found.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ShowVoteChoiceResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid bearer token",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "authenticated": {
+                                            "type": "boolean",
+                                            "example": false
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Show vote choice not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OperationResult"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/show-vote/{uuid}": {
+            "get": {
+                "tags": [
+                    "Show Vote"
+                ],
+                "summary": "description",
+                "operationId": "get_show_vote",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Show vote UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Show vote found.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ShowVoteResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid bearer token",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "authenticated": {
+                                            "type": "boolean",
+                                            "example": false
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Show vote not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OperationResult"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/show-vote/{uuid}/voter": {
+            "post": {
+                "tags": [
+                    "Voter"
+                ],
+                "summary": "Create a voter for a show vote",
+                "operationId": "post_show_vote_create_voter",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Show vote uuid",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateVoterRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Voter created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OperationResult"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid JSON body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OperationResult"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid bearer token",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "authenticated": {
+                                            "type": "boolean",
+                                            "example": false
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Show vote not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OperationResult"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Show vote is not open, or uniqRef, email or phone already used for this show vote",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OperationResult"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid payload",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OperationResult"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OperationResult"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/show-vote/{uuid}/voter/{userRef}": {
+            "get": {
+                "tags": [
+                    "Voter"
+                ],
+                "summary": "Get a voter of a show vote",
+                "operationId": "get_show_vote_get_voter",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Show vote uuid",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "userRef",
+                        "in": "path",
+                        "description": "Voter uniqRef",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Voter found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GetVoterResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid bearer token",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "authenticated": {
+                                            "type": "boolean",
+                                            "example": false
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Show vote or voter not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OperationResult"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Show vote is not open",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OperationResult"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OperationResult"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/show-vote/{uuidSV}/voter/{uniqRef}/add-vote": {
+            "post": {
+                "tags": [
+                    "Voter"
+                ],
+                "summary": "Add additional votes for a voter",
+                "operationId": "post_show_vote_add_vote",
+                "parameters": [
+                    {
+                        "name": "uuidSV",
+                        "in": "path",
+                        "description": "Show vote uuid",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "uniqRef",
+                        "in": "path",
+                        "description": "Voter uniqRef",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AddVoteRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Additional votes recorded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "status",
+                                        "nbVoteRemaining",
+                                        "code",
+                                        "message"
+                                    ],
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "success",
+                                            "enum": [
+                                                "success"
+                                            ]
+                                        },
+                                        "nbVoteRemaining": {
+                                            "description": "Votes remaining after the credit",
+                                            "type": "integer",
+                                            "example": 56
+                                        },
+                                        "code": {
+                                            "type": "integer",
+                                            "example": 201
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Additional votes recorded."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid JSON body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OperationResult"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid bearer token",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "authenticated": {
+                                            "type": "boolean",
+                                            "example": false
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Show vote or voter not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OperationResult"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Show vote is not open, there is no open voting round, the current round is deleted, or the acquisition limit for this vote type is reached. nbVoteRemaining is present only when a limit is reached.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "status",
+                                        "code",
+                                        "message"
+                                    ],
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "error",
+                                            "enum": [
+                                                "error"
+                                            ]
+                                        },
+                                        "code": {
+                                            "type": "integer",
+                                            "example": 409
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "VIDEO limit of 10 reached for the round."
+                                        },
+                                        "nbVoteRemaining": {
+                                            "description": "Current votes remaining. Present only when an acquisition limit is reached.",
+                                            "type": "integer",
+                                            "example": 53,
+                                            "nullable": true
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid payload",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OperationResult"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OperationResult"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/show-vote/{uuidSV}/voter/{uniqRef}/vote": {
+            "post": {
+                "tags": [
+                    "Voter"
+                ],
+                "summary": "Cast votes for one or more participants in the current voting round",
+                "operationId": "post_show_vote_cast_vote",
+                "parameters": [
+                    {
+                        "name": "uuidSV",
+                        "in": "path",
+                        "description": "Show vote uuid",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "uniqRef",
+                        "in": "path",
+                        "description": "Voter uniqRef",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CastVoteRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Votes recorded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "status",
+                                        "nbVoteRemaining",
+                                        "code",
+                                        "message"
+                                    ],
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "success",
+                                            "enum": [
+                                                "success"
+                                            ]
+                                        },
+                                        "nbVoteRemaining": {
+                                            "description": "Votes remaining after the operation",
+                                            "type": "integer",
+                                            "example": 9
+                                        },
+                                        "code": {
+                                            "type": "integer",
+                                            "example": 201
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Votes recorded."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid JSON body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OperationResult"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid bearer token",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "authenticated": {
+                                            "type": "boolean",
+                                            "example": false
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Show vote, voter or choice not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OperationResult"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Show vote is not open, there is no open voting round, the current round is deleted or locked, the voter is blocked, a choice is eliminated, or the requested votes exceed the balance. nbVoteRemaining is present only when the balance is insufficient.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "status",
+                                        "code",
+                                        "message"
+                                    ],
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "error",
+                                            "enum": [
+                                                "error"
+                                            ]
+                                        },
+                                        "code": {
+                                            "type": "integer",
+                                            "example": 409
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Requested 12 votes exceed the available balance of 9."
+                                        },
+                                        "nbVoteRemaining": {
+                                            "description": "Current votes remaining. Present only when the balance is insufficient.",
+                                            "type": "integer",
+                                            "example": 9,
+                                            "nullable": true
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid payload or duplicated choice",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OperationResult"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OperationResult"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "OperationResult": {
+                "required": [
+                    "status",
+                    "code",
+                    "message"
+                ],
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "success",
+                            "error"
+                        ]
+                    },
+                    "code": {
+                        "type": "integer",
+                        "example": 201
+                    },
+                    "message": {
+                        "type": "string",
+                        "example": "Voter created."
+                    }
+                },
+                "type": "object"
+            },
+            "CreateVoterRequest": {
+                "properties": {
+                    "email": {
+                        "description": "User email address",
+                        "type": "string",
+                        "example": "ozzy.osbourne@example.com",
+                        "default": "",
+                        "maxLength": 255
+                    },
+                    "phone": {
+                        "description": "Phone number. Optional. Keep it as a string to preserve the country code and leading zeros.",
+                        "type": "string",
+                        "pattern": ".*\\A\\+?[0-9]{6,15}\\z.*",
+                        "example": "+33601020304",
+                        "nullable": true,
+                        "default": null
+                    },
+                    "uniqRef": {
+                        "description": "External or client-side unique reference",
+                        "type": "string",
+                        "example": "ozzy-001",
+                        "default": "",
+                        "maxLength": 255
+                    }
+                },
+                "type": "object"
+            },
+            "AddVoteRequest": {
+                "properties": {
+                    "additionalVoteType": {
+                        "description": "Type of additional vote acquisition.",
+                        "type": "string",
+                        "example": "VIDEO",
+                        "default": "",
+                        "enum": [
+                            "PURCHASE",
+                            "SPONSOR",
+                            "VIDEO",
+                            "GAME",
+                            "REFERAL",
+                            "PROMO"
+                        ]
+                    },
+                    "nbPoints": {
+                        "description": "Number of points associated with the acquisition.",
+                        "type": "integer",
+                        "example": 3,
+                        "default": 0,
+                        "minimum": 0,
+                        "exclusiveMinimum": true
+                    }
+                },
+                "type": "object"
+            },
+            "CastVoteChoiceRequest": {
+                "properties": {
+                    "choiceUuid": {
+                        "description": "Participant/choice identifier.",
+                        "type": "string",
+                        "format": "uuid",
+                        "example": "22222222-2222-4222-8222-222222222201",
+                        "default": ""
+                    },
+                    "nbVotes": {
+                        "description": "Number of votes allocated to the participant.",
+                        "type": "integer",
+                        "example": 7,
+                        "default": 0,
+                        "minimum": 0,
+                        "exclusiveMinimum": true
+                    }
+                },
+                "type": "object"
+            },
+            "CastVoteRequest": {
+                "properties": {
+                    "votes": {
+                        "description": "List of votes to submit.",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/CastVoteChoiceRequest"
+                        },
+                        "default": [],
+                        "minItems": 1
+                    },
+                    "sessionToken": {
+                        "description": "Session token supplied by the client/application.",
+                        "type": "string",
+                        "example": "sess-star-0001",
+                        "default": "",
+                        "maxLength": 255
+                    },
+                    "phoneFingerPrint": {
+                        "description": "Phone/device fingerprint.",
+                        "type": "string",
+                        "example": "fp-phone-0001",
+                        "default": "",
+                        "maxLength": 255
+                    },
+                    "ip": {
+                        "description": "Client IP address.",
+                        "type": "string",
+                        "example": "203.0.113.10",
+                        "default": "",
+                        "maxLength": 45
+                    },
+                    "userAgent": {
+                        "description": "Client user agent.",
+                        "type": "string",
+                        "example": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)",
+                        "default": ""
+                    },
+                    "uniqSubscriptionId": {
+                        "description": "Antifraud uniq subscription id.",
+                        "type": "string",
+                        "example": "sub-star-night-0001",
+                        "default": "",
+                        "maxLength": 255
+                    }
+                },
+                "type": "object"
+            },
+            "EliminatedRoundResponse": {
+                "required": [
+                    "uuid",
+                    "round"
+                ],
+                "properties": {
+                    "uuid": {
+                        "type": "string"
+                    },
+                    "round": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "ReintroducedRoundResponse": {
+                "required": [
+                    "uuid",
+                    "round"
+                ],
+                "properties": {
+                    "uuid": {
+                        "type": "string"
+                    },
+                    "round": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "ShowVoteChoiceResponse": {
+                "required": [
+                    "uuid",
+                    "showVoteUuid",
+                    "firstname",
+                    "lastname",
+                    "status",
+                    "order"
+                ],
+                "properties": {
+                    "uuid": {
+                        "type": "string"
+                    },
+                    "showVoteUuid": {
+                        "type": "string"
+                    },
+                    "firstname": {
+                        "type": "string"
+                    },
+                    "lastname": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "order": {
+                        "type": "integer"
+                    },
+                    "bio": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "desktopPicture": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "mobilePicture": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "eliminatedRound": {
+                        "nullable": true,
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/EliminatedRoundResponse"
+                            }
+                        ]
+                    },
+                    "reintroducedRound": {
+                        "nullable": true,
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/ReintroducedRoundResponse"
+                            }
+                        ]
+                    }
+                },
+                "type": "object"
+            },
+            "ChoiceResponse": {
+                "required": [
+                    "uuid",
+                    "firstname",
+                    "lastname"
+                ],
+                "properties": {
+                    "uuid": {
+                        "type": "string"
+                    },
+                    "firstname": {
+                        "type": "string"
+                    },
+                    "lastname": {
+                        "type": "string"
+                    },
+                    "bio": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "desktopPicture": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "mobilePicture": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "RoundResponse": {
+                "required": [
+                    "currentRound",
+                    "startDay",
+                    "endDay",
+                    "name",
+                    "choices"
+                ],
+                "properties": {
+                    "currentRound": {
+                        "type": "integer"
+                    },
+                    "startDay": {
+                        "type": "string"
+                    },
+                    "endDay": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "choices": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ChoiceResponse"
+                        }
+                    }
+                },
+                "type": "object"
+            },
+            "ShowVoteResponse": {
+                "required": [
+                    "name",
+                    "startDate",
+                    "endDate"
+                ],
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    },
+                    "startDate": {
+                        "type": "string"
+                    },
+                    "endDate": {
+                        "type": "string"
+                    },
+                    "round": {
+                        "nullable": true,
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/RoundResponse"
+                            }
+                        ]
+                    }
+                },
+                "type": "object"
+            },
+            "GetVoterResponse": {
+                "required": [
+                    "uniqRef",
+                    "remainingPoints",
+                    "userFraudStatus",
+                    "balance"
+                ],
+                "properties": {
+                    "uniqRef": {
+                        "description": "External or client-side unique reference",
+                        "type": "string",
+                        "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+                    },
+                    "email": {
+                        "description": "User email address",
+                        "type": "string",
+                        "example": "jean.dupont@example.com",
+                        "nullable": true
+                    },
+                    "phone": {
+                        "description": "Phone number",
+                        "type": "string",
+                        "example": "+33612345678",
+                        "nullable": true
+                    },
+                    "remainingPoints": {
+                        "description": "Sum of standard, additional and purchased points",
+                        "type": "integer",
+                        "example": 150
+                    },
+                    "userFraudStatus": {
+                        "description": "Fraud status of the voter",
+                        "type": "string",
+                        "example": "CLEAN",
+                        "enum": [
+                            "CLEAN",
+                            "SUSPICIOUS",
+                            "BLOCKED",
+                            "VERIFIED"
+                        ]
+                    },
+                    "balance": {
+                        "description": "Voter balance",
+                        "properties": {
+                            "standardPoint": {
+                                "type": "integer",
+                                "example": 100
+                            },
+                            "additionalPoint": {
+                                "type": "integer",
+                                "example": 50
+                            },
+                            "purchasedPoint": {
+                                "type": "integer",
+                                "example": 25
+                            }
+                        },
+                        "type": "object"
+                    }
+                },
+                "type": "object"
+            }
+        },
+        "securitySchemes": {
+            "bearerAuth": {
+                "type": "http",
+                "scheme": "bearer"
+            }
+        }
+    },
+    "tags": [
+        {
+            "name": "Show Vote Choices",
+            "description": "Show Vote Choices"
+        },
+        {
+            "name": "Show Vote",
+            "description": "Show Vote"
+        },
+        {
+            "name": "Voter",
+            "description": "Voter"
+        }
+    ]
+}

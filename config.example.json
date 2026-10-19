@@ -1,0 +1,49 @@
+{
+  "baseUrl": "https://your-dvlive-api.example.com",
+  "bearerToken": "",
+
+  "action": "getShowVote",
+
+  "showVote": {
+    "uuid": "00000000-0000-4000-8000-000000000001"
+  },
+
+  "showVoteChoice": {
+    "uuid": "22222222-2222-4222-8222-222222222201"
+  },
+
+  "createVoter": {
+    "showVoteUuid": "00000000-0000-4000-8000-000000000001",
+    "email": "ozzy.osbourne@example.com",
+    "phone": "+33601020304",
+    "uniqRef": "ozzy-001"
+  },
+
+  "getVoter": {
+    "showVoteUuid": "00000000-0000-4000-8000-000000000001",
+    "userRef": "ozzy-001"
+  },
+
+  "addVote": {
+    "showVoteUuid": "00000000-0000-4000-8000-000000000001",
+    "userRef": "ozzy-001",
+    "additionalVoteType": "VIDEO",
+    "nbPoints": 3
+  },
+
+  "castVote": {
+    "showVoteUuid": "00000000-0000-4000-8000-000000000001",
+    "userRef": "ozzy-001",
+    "votes": [
+      {
+        "choiceUuid": "22222222-2222-4222-8222-222222222201",
+        "nbVotes": 1
+      }
+    ],
+    "sessionToken": "sess-star-0001",
+    "phoneFingerPrint": "fp-phone-0001",
+    "ip": "203.0.113.10",
+    "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)",
+    "uniqSubscriptionId": "sub-star-night-0001"
+  }
+}
