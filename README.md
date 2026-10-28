@@ -1,98 +1,106 @@
-# dvlive-runner — DV Live web show engine
+# DVLive
 
-A tiny Node.js script that calls the **DV Live web show engine** API from the command line using `config.json`.
+- `runner/`: runner Node.js originale, client, configurazione e specifica OpenAPI.
+- `supabase/`: unica Edge Function **DVLive** e configurazione del backend.
+- `script/`: smoke test per Supabase locale/remoto e test del proxy.
 
-It mirrors the Smart Journey reference runner (`smart-journey/runner/`): one HTTP client (`dvliveClient.js`) and one dispatcher (`run.js`).
+## Runner
 
-## Requirements
-
-- Node.js >= 18 (uses the built-in `fetch`)
-
-## Setup
-
-1. Copy the example config and edit it:
-
-   ```bash
-   cp config.example.json config.json
-   ```
-
-2. Set `baseUrl` and `bearerToken` (HTTP Bearer). All OpenAPI endpoints require a valid token.
-
-   ```json
-   {
-     "baseUrl": "https://your-dvlive-api.example.com",
-     "bearerToken": "…",
-     "action": "getShowVote",
-     "showVote": { "uuid": "…" }
-   }
-   ```
-
-## Usage
-
-```bash
-npm run help               # summary of all actions
-npm run help -- getVoter   # detail for one action
-
-npm run getShowVoteChoice  # GET  /show-vote-choice/{uuid}
-npm run getShowVote        # GET  /show-vote/{uuid}
-npm run createVoter        # POST /show-vote/{uuid}/voter
-npm run getVoter           # GET  /show-vote/{uuid}/voter/{userRef}
-npm run addVote            # POST .../add-vote
-npm run castVote           # POST .../vote
-
-npm start                  # uses config.action
-npm start -- getVoter      # CLI arg overrides config.action
-node run.js getShowVote
+```sh
+cd runner
+npm run help
+npm run getShowVote
 ```
 
-Each run prints the call signature, the full JSON response, and a short summary where useful.
+La configurazione locale esistente è in `runner/config.json` (ignorata da Git).
+Vedi [runner/README.md](runner/README.md) per tutte le azioni.
 
-## Configuration reference
+## Edge Function
 
-| Key | Type | Required | Description |
-| --- | --- | --- | --- |
-| `baseUrl` | string | yes | API base URL (no trailing slash). |
-| `bearerToken` | string | yes (prod) | Bearer token for `Authorization`. |
-| `action` | string | no | Default action; overridden by CLI arg. |
-| `showVote.uuid` | string | yes for `getShowVote` | Show vote UUID. |
-| `showVoteChoice.uuid` | string | yes for `getShowVoteChoice` | Choice/participant UUID. |
-| `createVoter.showVoteUuid` | string | yes for `createVoter` | Path UUID. |
-| `createVoter.email` | string | no | Request body. |
-| `createVoter.phone` | string | no | Request body. |
-| `createVoter.uniqRef` | string | no | Request body. |
-| `getVoter.showVoteUuid` | string | yes for `getVoter` | Path UUID. |
-| `getVoter.userRef` | string | yes for `getVoter` | Voter uniqRef (path). |
-| `addVote.showVoteUuid` | string | yes for `addVote` | Path UUID. |
-| `addVote.userRef` | string | yes for `addVote` | Voter uniqRef (path). |
-| `addVote.additionalVoteType` | string | no | Body (`VIDEO`, `PURCHASE`, …). |
-| `addVote.nbPoints` | integer | no | Body. |
-| `castVote.showVoteUuid` | string | yes for `castVote` | Path UUID. |
-| `castVote.userRef` | string | yes for `castVote` | Voter uniqRef (path). |
-| `castVote.votes` | array | yes for `castVote` | Body: `{ choiceUuid, nbVotes }[]`. |
-| `castVote.sessionToken` | string | no | Antifraud body fields. |
-| `castVote.phoneFingerPrint` | string | no | Antifraud body fields. |
-| `castVote.ip` | string | no | Antifraud body fields. |
-| `castVote.userAgent` | string | no | Antifraud body fields. |
-| `castVote.uniqSubscriptionId` | string | no | Antifraud body fields. |
+Endpoint: `https://<project-ref>.supabase.co/functions/v1/dvlive`.
+Richiede un JWT Supabase valido in `Authorization: Bearer <jwt>`.
+Passare il token DV Live in ogni chiamata operativa nell'header
+`bearer-token: <token>` (senza prefisso `Bearer`), separato dal JWT Supabase.
+La funzione lo inoltra all'API DV Live come `Authorization: Bearer <token>`.
+Non è salvato nelle variabili d'ambiente della funzione. Il catalogo non richiede questo header.
 
-For POST actions, path fields (`showVoteUuid`, `userRef`) are stripped from the JSON body automatically.
+`GET /functions/v1/dvlive` senza `mode` restituisce tutte le mode con descrizioni,
+metodo HTTP, parametri query obbligatori, campi JSON e tipo della risposta.
+Le risposte e gli status dell'API DV Live vengono inoltrati senza wrapper aggiuntivi.
 
-## Supported actions
+| mode | Metodo | Query oltre a `mode` | Body JSON | Risposta |
+| --- | --- | --- | --- | --- |
+| `getShowVoteChoice` | GET | `uuid` | — | Partecipante, stato, immagini, round |
+| `getShowVote` | GET | `uuid` | — | Show, date e round corrente con partecipanti |
+| `getVoter` | GET | `showVoteUuid`, `userRef` | — | Votante, saldo, stato antifrode |
+| `createVoter` | POST | `showVoteUuid` | `email`, `phone`, `uniqRef` opzionali | Esito registrazione |
+| `addVote` | POST | `showVoteUuid`, `userRef` | `additionalVoteType`, `nbPoints` | Esito accredito e voti rimanenti se presenti |
+| `castVote` | POST | `showVoteUuid`, `userRef` | `votes` obbligatorio, campi antifrode opzionali | Esito voto e voti rimanenti se presenti |
 
-| Action | HTTP | Method on client |
-| --- | --- | --- |
-| `getShowVoteChoice` | `GET /show-vote-choice/{uuid}` | `client.showVoteChoices.get(uuid)` |
-| `getShowVote` | `GET /show-vote/{uuid}` | `client.showVotes.get(uuid)` |
-| `createVoter` | `POST /show-vote/{uuid}/voter` | `client.voters.create(showVoteUuid, body)` |
-| `getVoter` | `GET /show-vote/{uuid}/voter/{userRef}` | `client.voters.get(showVoteUuid, userRef)` |
-| `addVote` | `POST .../add-vote` | `client.voters.addVote(showVoteUuid, uniqRef, body)` |
-| `castVote` | `POST .../vote` | `client.voters.castVote(showVoteUuid, uniqRef, body)` |
+`votes` è un array non vuoto di `{ "choiceUuid": "...", "nbVotes": 1 }`.
+I campi antifrode sono `sessionToken`, `phoneFingerPrint`, `ip`, `userAgent`,
+`uniqSubscriptionId`. Gli altri vincoli sono verificati dall'API upstream.
+Per POST inviare `Content-Type: application/json`; i parametri query non vanno nel body.
 
-## Files
+```sh
+curl 'http://127.0.0.1:54321/functions/v1/dvlive?mode=getShowVote&uuid=SHOW_UUID' \
+  -H "Authorization: Bearer $SUPABASE_JWT" \
+  -H "bearer-token: $DVLIVE_BEARER_TOKEN"
 
-- `run.js` — entry point; loads config, picks an action, dispatches.
-- `dvliveClient.js` — HTTP client + typed errors (`DvliveAuthError`, `DvliveForbiddenError`, `DvliveNotFoundError`, `DvliveConflictError`, `DvliveValidationError`, `DvliveRateLimitError`, `DvliveError`).
-- `dvlive-api.md` — short API notes aligned with `openapi.json`.
-- `openapi.json` — OpenAPI spec.
-- `config.example.json` — template configuration.
-- `config.json` — real configuration; **gitignored** (may contain tokens).
+curl 'http://127.0.0.1:54321/functions/v1/dvlive?mode=castVote&showVoteUuid=SHOW_UUID&userRef=VOTER_REF' \
+  -H "Authorization: Bearer $SUPABASE_JWT" \
+  -H "bearer-token: $DVLIVE_BEARER_TOKEN" \
+  -H 'Content-Type: application/json' \
+  --data '{"votes":[{"choiceUuid":"CHOICE_UUID","nbVotes":1}]}'
+```
+
+### Ambiente locale e deploy
+
+`supabase/.env` contiene solo `DVLIVE_BASE_URL` (URL dell'API DV Live).
+È già stato inizializzato dalla configurazione locale del runner
+ed è ignorato da Git. Su un nuovo checkout copiarlo da `supabase/.env.example`.
+
+Con Supabase CLI e Docker disponibili, dalla root del repository:
+
+```sh
+supabase start
+supabase functions serve dvlive --env-file supabase/.env
+```
+
+Per pubblicare nel proprio progetto:
+
+```sh
+supabase secrets set --env-file supabase/.env --project-ref PROJECT_REF
+supabase functions deploy dvlive --project-ref PROJECT_REF
+```
+
+Il file `.env` viene passato esplicitamente con `--env-file`, secondo la
+[documentazione Supabase](https://supabase.com/docs/guides/functions/secrets).
+La verifica JWT resta abilitata, anche per il catalogo.
+
+## Smoke test
+
+Gli script seguono le convenzioni di `atom`: un file Bash per mode, helper comune,
+variabili locali modificabili all'inizio di ogni test. Richiedono `curl` e `jq`.
+
+```sh
+# Impostare URL e token in script/smoke-dvlive-common.sh.
+# Impostare gli identificativi nel blocco locale di ogni test.
+./script/smoke-get-show-vote.sh
+./script/smoke-get-show-vote-choice.sh
+./script/smoke-get-voter.sh
+```
+
+Non serve fare `export`. Per Supabase remoto impostare `SUPABASE_URL` e
+`SUPABASE_ANON_KEY` in `script/smoke-dvlive-common.sh`, insieme a
+`DVLIVE_BEARER_TOKEN`.
+In locale l'URL predefinito è `http://127.0.0.1:54321`; la chiave viene risolta
+come in `atom`, da ambiente, `supabase status -o json`, poi chiave demo locale.
+Il token DV Live viene inviato tramite `bearer-token` e non va nel `.env` del server.
+
+Dettagli, script POST e variabili disponibili: [script/README.md](script/README.md).
+I test locali con upstream simulato richiedono Node.js >=22.18, Bash, curl e jq:
+
+```sh
+./script/test.sh
+```

@@ -1,2 +1,7 @@
 config.json
 node_modules/
+.env
+.env.*
+!.env.example
+supabase/.temp/
+supabase/.branches/

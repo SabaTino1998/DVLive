@@ -146,13 +146,23 @@ class DvliveClient {
     };
 
     const urlStr = url.toString();
+    const requestBody = body !== undefined ? JSON.stringify(body) : undefined;
+    const shellQuote = (value) => `'${String(value).replace(/'/g, "'\\''")}'`;
+    const curl = ['curl', '-X', shellQuote(method), shellQuote(urlStr)];
+    for (const [name, value] of Object.entries(reqHeaders)) {
+      curl.push('-H', shellQuote(`${name}: ${value}`));
+    }
+    if (requestBody !== undefined) {
+      curl.push('--data-raw', shellQuote(requestBody));
+    }
     console.log(`  ${method} ${urlStr}`);
+    console.log(curl.join(' '));
     let res;
     try {
       res = await fetch(url, {
         method,
         headers: reqHeaders,
-        body: body !== undefined ? JSON.stringify(body) : undefined,
+        body: requestBody,
       });
     } catch (err) {
       throw new DvliveError(`Network error: ${err.message}`, {

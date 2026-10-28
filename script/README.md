@@ -1,0 +1,100 @@
+# DVLive smoke tests
+
+Richiedono Bash, curl, jq, una Edge Function DVLive attiva e un token DV Live valido.
+Seguono la struttura degli smoke test di `atom`: uno script per mode, helper comune,
+variabili locali in ogni script, URL e stato HTTP stampati, risposta JSON verificata.
+
+URL e credenziali sono configurati una sola volta all'inizio di
+`smoke-dvlive-common.sh`. Modificare i valori dopo `:-`; non serve eseguire `export`:
+
+```sh
+SUPABASE_URL="${SUPABASE_URL:-http://127.0.0.1:54321}"
+SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY:-}"
+DVLIVE_BEARER_TOKEN="${DVLIVE_BEARER_TOKEN:-TOKEN_DV_LIVE}"
+```
+
+Lasciare `SUPABASE_ANON_KEY` vuota per il rilevamento locale automatico.
+Ogni test mantiene solo i propri parametri nel blocco iniziale, per esempio
+`SHOW_VOTE_UUID`, `CHOICE_UUID`, `USER_REF` e i campi del body.
+Poi eseguire dalla root del repository:
+
+```sh
+./script/smoke-get-show-vote.sh
+./script/smoke-get-show-vote-choice.sh
+./script/smoke-get-voter.sh
+./script/smoke-catalog.sh
+```
+
+| Script | Mode | Controllo |
+| --- | --- | --- |
+| `smoke-get-show-vote.sh` | `getShowVote` | Nome, date e round opzionale dello show |
+| `smoke-get-show-vote-choice.sh` | `getShowVoteChoice` | UUID, show, nome, stato e ordine del partecipante |
+| `smoke-get-voter.sh` | `getVoter` | Riferimento, punti, stato antifrode e saldo |
+| `smoke-create-voter.sh` | `createVoter` | HTTP 201 ed esito registrazione |
+| `smoke-add-vote.sh` | `addVote` | HTTP 200 ed esito accredito |
+| `smoke-cast-vote.sh` | `castVote` | HTTP 200 ed esito voto |
+| `smoke-catalog.sh` | Nessuna | Catalogo completo con descrizioni delle sei mode |
+
+Le mode rimangono nei parametri URL. Le operazioni GET non inviano un body;
+le operazioni POST inviano JSON. Le risposte dell'API DV Live rimangono inalterate,
+senza introdurre l'envelope `ok` di Atom. HTTP inatteso, errore di trasporto o risposta
+non valida terminano con exit code 1. Con `OUT_FILE` il JSON viene salvato nel file
+indicato, sostituendolo se esiste; altrimenti viene stampato.
+
+## Configurazione locale
+
+| Variabile | Default / utilizzo |
+| --- | --- |
+| `SUPABASE_URL` | `http://127.0.0.1:54321` |
+| `SUPABASE_ANON_KEY` | Ambiente, poi `supabase status -o json`, poi chiave demo locale |
+| `REPO_ROOT` | Repository corrente, usato per `supabase status` |
+| `DVLIVE_BEARER_TOKEN` | Obbligatorio per le sei mode; header `bearer-token`, senza prefisso Bearer |
+| `SHOW_VOTE_UUID` | `00000000-0000-4000-8000-000000000001` (esempio del runner) |
+| `CHOICE_UUID` | `22222222-2222-4222-8222-222222222201` (esempio del runner) |
+| `USER_REF` | `dvlive-smoke` |
+| `OUT_FILE` | Opzionale: esporta la risposta JSON |
+| `EXPECTED_STATUS` | Opzionale per POST: 201 per creazione, 200 per accredito/voto |
+
+Sostituire gli identificativi di esempio con risorse esistenti nell'ambiente scelto.
+Il catalogo non richiede il token DV Live; richiede comunque l'autenticazione Supabase.
+Per progetti remoti inserire URL e chiave Supabase nel blocco condiviso di
+`smoke-dvlive-common.sh`.
+
+La chiave deve essere accettata dalla verifica JWT del gateway (per esempio la chiave
+anon JWT legacy). Le nuove chiavi publishable non sono JWT.
+L'unica variabile server in `supabase/.env` è `DVLIVE_BASE_URL`, caricata passando
+`--env-file supabase/.env` a `supabase functions serve dvlive`.
+Non occorre un file JSON di configurazione per gli smoke test.
+
+## Operazioni POST
+
+Questi script modificano i dati. Usare uno show di test attivo e un nuovo `USER_REF`;
+per un flusso completo impostare lo stesso riferimento nei blocchi locali dei tre
+script ed eseguirli nell'ordine seguente:
+
+```sh
+./script/smoke-create-voter.sh
+./script/smoke-add-vote.sh
+./script/smoke-cast-vote.sh
+```
+
+`createVoter` accetta `EMAIL` e `PHONE` opzionali.
+`addVote` usa `NB_POINTS=1` e `ADDITIONAL_VOTE_TYPE=VIDEO` come default.
+`castVote` invia un voto per `CHOICE_UUID`; `VOTES` permette di passare un array JSON:
+
+```sh
+# Impostare VOTES nel blocco locale di smoke-cast-vote.sh, poi eseguire:
+./script/smoke-cast-vote.sh
+```
+
+I campi antifrode opzionali sono `SESSION_TOKEN`, `PHONE_FINGER_PRINT`, `IP`,
+`USER_AGENT` e `UNIQ_SUBSCRIPTION_ID`.
+
+## Verifica locale
+
+```sh
+./script/test.sh
+```
+
+Richiede anche Node.js >=22.18 per importare direttamente `index.ts`.
+Verifica il proxy e ogni smoke test con upstream simulato, senza rete o credenziali reali.

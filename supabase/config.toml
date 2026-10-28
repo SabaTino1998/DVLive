@@ -1,0 +1,6 @@
+project_id = "DVLive"
+
+[functions.dvlive]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/dvlive/index.ts"
