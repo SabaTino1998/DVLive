@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { setTimeout as delay } from "node:timers/promises";
-import { ApiService, ApiHttpError, ApiRequestError, ApiResponseError } from "../dist/index.js";
+import { ApiService, ApiValidationError, ApiHttpError, ApiRequestError, ApiResponseError } from "../dist/index.js";
 
 const config = { environment: "STAG", headers: { Authorization: "Bearer test-token" } };
 const show = { name: "Show", startDate: "2026-01-01", endDate: "2026-12-31", round: null };
@@ -150,8 +150,8 @@ test("invalid environment, configuration and path parameters fail before making 
     assert.throws(() => new ApiService({ environment }), TypeError);
   }
   for (const timeoutMs of [0, -1, Infinity, 0.5]) assert.throws(() => new ApiService({ ...config, timeoutMs }), TypeError);
-  for (const value of ["", " ", ".", "..", undefined]) assert.throws(() => new ApiService(config).getShowVote(value), TypeError);
-  assert.throws(() => new ApiService(config).getVoter("show", undefined), TypeError);
+  for (const value of ["", " ", ".", "..", undefined, null, 123]) assert.throws(() => new ApiService(config).getShowVote(value), ApiValidationError);
+  assert.throws(() => new ApiService(config).getVoter("show", undefined), ApiValidationError);
   assert.equal(mock.mock.callCount(), 0);
 });
 

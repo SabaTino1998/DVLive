@@ -1,4 +1,4 @@
-/** Invalid request body. No upstream HTTP request has been made. */
+/** Invalid request parameter or body. No upstream HTTP request has been made. */
 export class ApiValidationError extends Error {
   constructor(message: string) {
     super(message);

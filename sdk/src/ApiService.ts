@@ -1,4 +1,4 @@
-import { ApiHttpError, ApiRequestError, ApiResponseError } from "./errors.ts";
+import { ApiHttpError, ApiRequestError, ApiResponseError, ApiValidationError } from "./errors.ts";
 import { resolveBaseUrl, type ApiEnvironment } from "./environment.ts";
 import { validateCreateVoter, validateAddVote, validateCastVote } from "./validation.ts";
 import type { ApiResponse } from "./models/api-response.ts";
@@ -17,7 +17,7 @@ export interface ApiServiceConfig {
 
 function pathParameter(value: string, name: string): string {
   if (typeof value !== "string" || !value.trim() || value === "." || value === "..") {
-    throw new TypeError(`${name} must be a non-empty path parameter.`);
+    throw new ApiValidationError(`${name} must be a non-empty path parameter.`);
   }
   return encodeURIComponent(value);
 }

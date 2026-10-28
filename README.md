@@ -1,9 +1,9 @@
 # DVLive
 
-- `sdk/`: pacchetto TypeScript `@digitalvirgo/dvlive-api`, con risposte e metadati HTTP tipizzati.
-- `runner/`: runner Node.js originale, client, configurazione e specifica OpenAPI.
-- `supabase/`: unica Edge Function **DVLive** e configurazione del backend.
-- `script/`: smoke test per Supabase locale/remoto e test del proxy.
+- `sdk/`: TypeScript package `@digitalvirgo/dvlive-api`, with typed responses and HTTP metadata.
+- `runner/`: original Node.js runner, client, configuration, and OpenAPI specification.
+- `supabase/`: single **DVLive** Edge Function and backend configuration.
+- `script/`: smoke tests for local/remote Supabase and proxy tests.
 
 ## Runner
 
@@ -13,39 +13,39 @@ npm run help
 npm run getShowVote
 ```
 
-La configurazione locale esistente è in `runner/config.json` (ignorata da Git).
-Vedi [runner/README.md](runner/README.md) per tutte le azioni.
+The existing local configuration is in `runner/config.json` (ignored by Git).
+See [runner/README.md](runner/README.md) for all available actions.
 
 ## Edge Function
 
 Endpoint: `https://<project-ref>.supabase.co/functions/v1/dvlive`.
-La verifica del JWT Supabase dipende da `verify_jwt` in `supabase/config.toml`
-(attualmente `false`). Gli smoke test inviano comunque gli header Supabase.
-Passare il token DV Live in ogni chiamata operativa nell'header
-`bearer-token: <token>` (senza prefisso `Bearer`), separato dal JWT Supabase.
-La funzione lo inoltra all'API DV Live come `Authorization: Bearer <token>`.
-Non è salvato nelle variabili d'ambiente della funzione. Il catalogo non richiede questo header.
+Supabase JWT verification depends on `verify_jwt` in `supabase/config.toml`
+(currently `false`). Smoke tests still send the Supabase headers.
+Pass the DV Live token with each operation request in the
+`bearer-token: <token>` header (without the `Bearer` prefix), separately from the Supabase JWT.
+The function forwards it to the DV Live API as `Authorization: Bearer <token>`.
+It is not stored in the function's environment variables. The catalog does not require this header.
 
-La Edge Function usa `parseMode` dell'SDK per convertire il parametro query
-nell'enum `ApiMode`. Se `mode` manca, è vuota o non è riconosciuta, restituisce
-HTTP `200` con tutte le mode, descrizioni in inglese, metodo HTTP, parametri query
-obbligatori, campi JSON e tipo della risposta. Il catalogo arriva direttamente
-dall'SDK e non richiede token DV Live o configurazione dell'ambiente.
-Le risposte e gli status dell'API DV Live vengono inoltrati senza wrapper aggiuntivi.
+The Edge Function uses the SDK's `parseMode` to convert the query parameter
+into the `ApiMode` enum. If `mode` is missing, empty, or unrecognized, it returns
+HTTP `200` with all modes, English descriptions, HTTP methods, required query
+parameters, JSON fields, and response types. The catalog comes directly
+from the SDK and does not require a DV Live token or environment configuration.
+DV Live API responses and status codes are forwarded without additional wrappers.
 
-| mode | Metodo | Query oltre a `mode` | Body JSON | Risposta |
+| mode | Method | Query parameters besides `mode` | JSON body | Response |
 | --- | --- | --- | --- | --- |
-| `getShowVoteChoice` | GET | `uuid` | — | Partecipante, stato, immagini, round |
-| `getShowVote` | GET | `uuid` | — | Show, date e round corrente con partecipanti |
-| `getVoter` | GET | `showVoteUuid`, `userRef` | — | Votante, saldo, stato antifrode |
-| `createVoter` | POST | `showVoteUuid` | `email`, `phone`, `uniqRef` opzionali | Esito registrazione |
-| `addVote` | POST | `showVoteUuid`, `userRef` | `additionalVoteType`, `nbPoints` | Esito accredito e voti rimanenti se presenti |
-| `castVote` | POST | `showVoteUuid`, `userRef` | `votes` obbligatorio, campi antifrode opzionali | Esito voto e voti rimanenti se presenti |
+| `getShowVoteChoice` | GET | `uuid` | — | Participant, status, images, rounds |
+| `getShowVote` | GET | `uuid` | — | Show, dates, and current round with participants |
+| `getVoter` | GET | `showVoteUuid`, `userRef` | — | Voter, balance, fraud status |
+| `createVoter` | POST | `showVoteUuid` | Optional `email`, `phone`, `uniqRef` | Registration result |
+| `addVote` | POST | `showVoteUuid`, `userRef` | `additionalVoteType`, `nbPoints` | Vote credit result and remaining votes, when provided |
+| `castVote` | POST | `showVoteUuid`, `userRef` | Required `votes`, optional fraud prevention fields | Voting result and remaining votes, when provided |
 
-`votes` è un array non vuoto di `{ "choiceUuid": "...", "nbVotes": 1 }`.
-I campi antifrode sono `sessionToken`, `phoneFingerPrint`, `ip`, `userAgent`,
-`uniqSubscriptionId`. L'SDK verifica il body, i tipi dei campi, gli enum e i valori di voto prima della chiamata HTTP; gli altri vincoli sono verificati dall'API upstream.
-Per POST inviare `Content-Type: application/json`; i parametri query non vanno nel body.
+`votes` is a non-empty array of `{ "choiceUuid": "...", "nbVotes": 1 }`.
+The fraud prevention fields are `sessionToken`, `phoneFingerPrint`, `ip`, `userAgent`,
+and `uniqSubscriptionId`. The SDK validates the body, field types, enums, and vote values before the HTTP request; other constraints are checked by the upstream API.
+For POST requests, send `Content-Type: application/json`; query parameters do not belong in the body.
 
 ```sh
 curl 'http://127.0.0.1:54321/functions/v1/dvlive?mode=getShowVote&uuid=SHOW_UUID' \
@@ -59,50 +59,50 @@ curl 'http://127.0.0.1:54321/functions/v1/dvlive?mode=castVote&showVoteUuid=SHOW
   --data '{"votes":[{"choiceUuid":"CHOICE_UUID","nbVotes":1}]}'
 ```
 
-### Ambiente locale e deploy
+### Local environment and deployment
 
-`supabase/.env` contiene `DVLIVE_ENV`, con valore `STAG` o `PROD`:
+`supabase/.env` contains `DVLIVE_ENV`, set to `STAG` or `PROD`:
 
 ```dotenv
 DVLIVE_ENV=STAG
 ```
 
-L'SDK sceglie il base URL in base all'ambiente: `STAG` usa
-`https://dev-webshow-engine.dv-live.com`, `PROD` usa
-`https://webshow-engine.dv-live.com`. La mappa è interna all'SDK. Un valore mancante o diverso da
-`STAG` e `PROD` produce un errore di configurazione HTTP 500 per le chiamate operative.
-Il catalogo resta disponibile anche senza configurazione.
-Il file è ignorato da Git; su un nuovo checkout copiarlo da `supabase/.env.example`.
+The SDK selects the base URL according to the environment: `STAG` uses
+`https://dev-webshow-engine.dv-live.com`, while `PROD` uses
+`https://webshow-engine.dv-live.com`. The mapping is internal to the SDK. A missing value or a value other than
+`STAG` or `PROD` results in an HTTP 500 configuration error for operation requests.
+The catalog remains available without configuration.
+The file is ignored by Git; on a fresh checkout, copy it from `supabase/.env.example`.
 
-Con Supabase CLI e Docker disponibili, dalla root del repository:
+With the Supabase CLI and Docker available, run from the repository root:
 
 ```sh
 supabase start
 supabase functions serve dvlive --env-file supabase/.env
 ```
 
-Per pubblicare nel proprio progetto:
+To deploy to your project:
 
 ```sh
 supabase secrets set --env-file supabase/.env --project-ref PROJECT_REF
 supabase functions deploy dvlive --project-ref PROJECT_REF
 ```
 
-Il file `.env` viene passato esplicitamente con `--env-file`, secondo la
-[documentazione Supabase](https://supabase.com/docs/guides/functions/secrets).
-La configurazione JWT del gateway viene mantenuta come definita in `supabase/config.toml`.
+The `.env` file is passed explicitly using `--env-file`, as described in the
+[Supabase documentation](https://supabase.com/docs/guides/functions/secrets).
+The gateway JWT configuration is kept as defined in `supabase/config.toml`.
 
 ## SDK
 
-La Edge Function usa `@digitalvirgo/dvlive-api` tramite la mappatura locale in
-`supabase/functions/dvlive/deno.json`. Non serve pubblicare il pacchetto per servire
-la funzione in locale o includerlo nel deploy.
+The Edge Function uses `@digitalvirgo/dvlive-api` through the local mapping in
+`supabase/functions/dvlive/deno.json`. The package does not need to be published to serve
+the function locally or include it in a deployment.
 
 ```ts
 import { ApiService } from "@digitalvirgo/dvlive-api";
 
 const api = new ApiService({
-  environment: "STAG", // La Edge Function legge questo valore da DVLIVE_ENV.
+  environment: "STAG", // The Edge Function reads this value from DVLIVE_ENV.
   headers: () => ({ Authorization: `Bearer ${token}` }),
 });
 const result = await api.getShowVote(uuid);
@@ -110,36 +110,35 @@ const result = await api.getShowVote(uuid);
 return json(result.data, result.status);
 ```
 
-Il wrapper resta interno all'SDK: il JSON pubblico rimane quello dell'API DV Live.
-Lo status effettivo viene preservato; solo `Retry-After` viene inoltrato dagli header
-upstream. Gli errori HTTP mantengono status e payload originali, anche testuali;
-errori di validazione del body diventano `400`, errori di rete o decodifica `502`, timeout `504`.
-Il timeout predefinito è 15 secondi; non vengono eseguiti retry automatici.
+The wrapper remains internal to the SDK: the public JSON remains the DV Live API response.
+The actual status code is preserved. HTTP errors retain their original status and payload, including text payloads;
+body validation errors become `400`, network or decoding errors become `502`, and timeouts become `504`.
+The default timeout is 15 seconds; no automatic retries are performed.
 
-Struttura, interfacce, errori e uso del pacchetto: [sdk/README.md](sdk/README.md).
+Package structure, interfaces, errors, and usage: [sdk/README.md](sdk/README.md).
 
-## Smoke test
+## Smoke tests
 
-Gli script seguono le convenzioni di `atom`: un file Bash per mode, helper comune,
-variabili locali modificabili all'inizio di ogni test. Richiedono `curl` e `jq`.
+The scripts follow the `atom` conventions: one Bash file per mode, a shared helper,
+and local variables editable at the start of each test. They require `curl` and `jq`.
 
 ```sh
-# Impostare URL e token in script/smoke-dvlive-common.sh.
-# Impostare gli identificativi nel blocco locale di ogni test.
+# Set the URL and token in script/smoke-dvlive-common.sh.
+# Set the identifiers in each test's local configuration block.
 ./script/smoke-get-show-vote.sh
 ./script/smoke-get-show-vote-choice.sh
 ./script/smoke-get-voter.sh
 ```
 
-Non serve fare `export`. Per Supabase remoto impostare `SUPABASE_URL` e
-`SUPABASE_ANON_KEY` in `script/smoke-dvlive-common.sh`, insieme a
+No `export` is needed. For remote Supabase, set `SUPABASE_URL` and
+`SUPABASE_ANON_KEY` in `script/smoke-dvlive-common.sh`, along with
 `DVLIVE_BEARER_TOKEN`.
-In locale l'URL predefinito è `http://127.0.0.1:54321`; la chiave viene risolta
-come in `atom`, da ambiente, `supabase status -o json`, poi chiave demo locale.
-Il token DV Live viene inviato tramite `bearer-token` e non va nel `.env` del server.
+Locally, the default URL is `http://127.0.0.1:54321`; the key is resolved
+as in `atom`: from the environment, then `supabase status -o json`, then the local demo key.
+The DV Live token is sent through `bearer-token` and does not belong in the server's `.env` file.
 
-Dettagli, script POST e variabili disponibili: [script/README.md](script/README.md).
-I test locali con upstream simulato richiedono Node.js >=22.18, Bash, curl e jq:
+Details, POST scripts, and available variables: [script/README.md](script/README.md).
+Local tests with a simulated upstream require Node.js >=22.18, Bash, curl, and jq:
 
 ```sh
 npm ci --prefix sdk

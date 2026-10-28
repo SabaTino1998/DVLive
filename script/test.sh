@@ -56,13 +56,13 @@ test("all six modes forward method, encoded paths, body, auth and upstream statu
   }
 });
 
-test("upstream failures preserve status, payload and Retry-After", async (t) => {
+test("upstream failures preserve status and payload", async (t) => {
   for (const status of [401, 403, 404, 409, 422, 429, 500]) {
     t.mock.method(globalThis, "fetch", async () => Response.json({ code: status, message: "error" }, { status, headers: { "Retry-After": "30" } }));
     const handler = createHandler({ env });
     const response = await handler(request("?mode=getShowVote&uuid=test"));
     assert.equal(response.status, status);
-    assert.equal(response.headers.get("retry-after"), "30");
+    assert.equal(response.headers.get("retry-after"), null);
     assert.deepEqual(await response.json(), { code: status, message: "error" });
   }
 });
@@ -106,7 +106,7 @@ test("missing or unparseable modes return the SDK catalog without authentication
   assert.equal(preflight.status, 204);
 });
 
-test("SDK results remain unwrapped and only approved upstream headers are forwarded", async (t) => {
+test("SDK results remain unwrapped without forwarding upstream headers", async (t) => {
   const payload = { status: "success", code: 201, message: "Recorded", nbVoteRemaining: 2 };
   const handler = createHandler({ env });
   for (const status of [200, 201]) {
@@ -118,9 +118,10 @@ test("SDK results remain unwrapped and only approved upstream headers are forwar
     }));
     assert.equal(response.status, status);
     assert.deepEqual(await response.json(), payload);
-    assert.equal(response.headers.get("retry-after"), "15");
+    assert.equal(response.headers.get("retry-after"), null);
     assert.equal(response.headers.get("set-cookie"), null);
     assert.equal(response.headers.get("x-upstream-internal"), null);
+    assert.equal(response.headers.get("access-control-expose-headers"), null);
   }
 });
 
@@ -132,7 +133,7 @@ test("non-JSON upstream errors retain their original body, content type and stat
     const response = await createHandler({ env })(request("?mode=getShowVote&uuid=show"));
     assert.equal(response.status, 503);
     assert.equal(response.headers.get("content-type"), "text/html");
-    assert.equal(response.headers.get("retry-after"), "10");
+    assert.equal(response.headers.get("retry-after"), null);
     assert.equal(response.headers.get("set-cookie"), null);
     assert.equal(await response.text(), text);
   }
@@ -189,6 +190,31 @@ test("validation rejects invalid inputs without calling upstream", async (t) => 
   for (const [mode, body] of [["createVoter", { phone: 123 }], ["addVote", { nbPoints: -1 }], ["addVote", { additionalVoteType: "INVALID" }], ["addVote", { additionalVoteType: ["VIDEO"] }], ["castVote", { votes: [{ choiceUuid: "choice", nbVotes: 1 }], ip: false }]]) {
     const response = await handler(request(`?mode=${mode}&showVoteUuid=show&userRef=voter`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }));
     assert.equal(response.status, 400);
+  }
+  assert.equal(upstream.mock.callCount(), 0);
+});
+
+test("SDK parameter validation errors are converted to HTTP 400 without upstream calls", async (t) => {
+  const upstream = t.mock.method(globalThis, "fetch", () => { throw new Error("Unexpected HTTP request"); });
+  const handler = createHandler({ env });
+  for (const [mode, parameter, query, body] of [
+    ["getShowVote", "uuid", ""],
+    ["getShowVoteChoice", "uuid", ""],
+    ["getVoter", "showVoteUuid", "userRef=voter"],
+    ["getVoter", "userRef", "showVoteUuid=show"],
+    ["createVoter", "showVoteUuid", "", {}],
+    ["addVote", "userRef", "showVoteUuid=show", {}],
+    ["castVote", "userRef", "showVoteUuid=show", { votes: [{ choiceUuid: "choice", nbVotes: 1 }] }],
+  ]) {
+    for (const value of [null, "", " ", ".", ".."]) {
+      const url = new URL(`https://proxy.test/?mode=${mode}&${query}`);
+      if (value !== null) url.searchParams.set(parameter, value);
+      const response = await handler(request(url.search, body === undefined ? {} : {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+      }));
+      assert.equal(response.status, 400);
+      assert.equal((await response.json()).message, `${parameter} must be a non-empty path parameter.`);
+    }
   }
   assert.equal(upstream.mock.callCount(), 0);
 });
