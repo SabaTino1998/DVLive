@@ -1,6 +1,7 @@
 import {
-  ApiService, ApiHttpError, ApiRequestError, ApiResponseError, ApiValidationError, ApiMode, API_MODES, parseMode,
-  type ApiModeDefinition, type ApiResponse, type CreateVoterRequest, type AddVoteRequest, type CastVoteRequest,
+  ApiService, ApiHttpError, ApiRequestError, ApiResponseError, ApiValidationError, ApiModes, API_MODES, parseMode,
+  type ApiModeDefinition, type ApiResponse, type ApiResult, CreateVoterBody, AddVoteBody, CastVoteBody,
+  GetShowVoteRequest, GetShowVoteChoiceRequest, GetVoterRequest, CreateVoterRequest, AddVoteRequest, CastVoteRequest,
 } from "@digitalvirgo/dvlive-api";
 
 interface HandlerOptions {
@@ -35,7 +36,7 @@ function error(status: number, message: string, headers: Record<string, string> 
   return json({ status: "error", code: status, message }, status, headers);
 }
 
-async function parseRequest(req: Request, action: ApiModeDefinition, mode: ApiMode) {
+async function parseRequest(req: Request, action: ApiModeDefinition, mode: ApiModes) {
   if (req.method !== action.method) {
     throw new InputError(`Mode ${mode} requires ${action.method}.`, 405, { Allow: `${action.method}, OPTIONS` });
   }
@@ -53,21 +54,21 @@ async function parseRequest(req: Request, action: ApiModeDefinition, mode: ApiMo
   return body;
 }
 
-function callApi(api: ApiService, mode: ApiMode, query: URLSearchParams, body?: unknown): Promise<ApiResponse<unknown>> {
+function callApi(api: ApiService, mode: ApiModes, query: URLSearchParams, body?: unknown): Promise<ApiResponse<ApiResult>> {
   const uuid = query.get("uuid") ?? "";
   const showVoteUuid = query.get("showVoteUuid") ?? "";
   const userRef = query.get("userRef") ?? "";
 
   // SDK methods validate parameters and the JSON body before making an HTTP request.
   switch (mode) {
-    case ApiMode.GetShowVote: return api.getShowVote(uuid);
-    case ApiMode.GetShowVoteChoice: return api.getShowVoteChoice(uuid);
-    case ApiMode.GetVoter: return api.getVoter(showVoteUuid, userRef);
-    case ApiMode.CreateVoter: return api.createVoter(showVoteUuid, body as CreateVoterRequest);
-    case ApiMode.AddVote: return api.addVote(showVoteUuid, userRef, body as AddVoteRequest);
-    case ApiMode.CastVote: return api.castVote(showVoteUuid, userRef, body as CastVoteRequest);
+    case ApiModes.GetShowVote: return api.getShowVote(new GetShowVoteRequest(uuid));
+    case ApiModes.GetShowVoteChoice: return api.getShowVoteChoice(new GetShowVoteChoiceRequest(uuid));
+    case ApiModes.GetVoter: return api.getVoter(new GetVoterRequest(showVoteUuid, userRef));
+    case ApiModes.CreateVoter: return api.createVoter(new CreateVoterRequest(showVoteUuid, CreateVoterBody.decode(body)));
+    case ApiModes.AddVote: return api.addVote(new AddVoteRequest(showVoteUuid, userRef, AddVoteBody.decode(body)));
+    case ApiModes.CastVote: return api.castVote(new CastVoteRequest(showVoteUuid, userRef, CastVoteBody.decode(body)));
     default: {
-      const unsupported: ApiMode = mode;
+      const unsupported: ApiModes = mode;
       throw new InputError(`Unsupported mode: ${unsupported}.`);
     }
   }
@@ -87,14 +88,10 @@ export function createHandler({ env }: HandlerOptions) {
       const body = await parseRequest(req, action, mode);
       const token = req.headers.get("bearer-token")?.trim();
       if (!token) throw new InputError("The bearer-token header is required (DV Live token without the Bearer prefix).", 401);
-      const environment = env("DVLIVE_ENV");
-      if (environment !== "STAG" && environment !== "PROD") {
-        return error(500, 'Configure DVLIVE_ENV as "STAG" or "PROD" on the server.');
-      }
       let api: ApiService;
       try {
         api = new ApiService({
-          environment,
+          environment: env("DVLIVE_ENV"),
           headers: () => ({ Authorization: `Bearer ${token}` }),
         });
       } catch {

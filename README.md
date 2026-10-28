@@ -27,11 +27,11 @@ The function forwards it to the DV Live API as `Authorization: Bearer <token>`.
 It is not stored in the function's environment variables. The catalog does not require this header.
 
 The Edge Function uses the SDK's `parseMode` to convert the query parameter
-into the `ApiMode` enum. If `mode` is missing, empty, or unrecognized, it returns
+into the `ApiModes` enum. If `mode` is missing, empty, or unrecognized, it returns
 HTTP `200` with all modes, English descriptions, HTTP methods, required query
 parameters, JSON fields, and response types. The catalog comes directly
 from the SDK and does not require a DV Live token or environment configuration.
-DV Live API responses and status codes are forwarded without additional wrappers.
+Mapped SDK response data and the original DV Live HTTP status codes are returned without additional wrappers.
 
 | mode | Method | Query parameters besides `mode` | JSON body | Response |
 | --- | --- | --- | --- | --- |
@@ -99,20 +99,26 @@ The Edge Function uses `@digitalvirgo/dvlive-api` through the local mapping in
 the function locally or include it in a deployment.
 
 ```ts
-import { ApiService } from "@digitalvirgo/dvlive-api";
+import { ApiService, GetShowVoteRequest } from "@digitalvirgo/dvlive-api";
 
 const api = new ApiService({
   environment: "STAG", // The Edge Function reads this value from DVLIVE_ENV.
   headers: () => ({ Authorization: `Bearer ${token}` }),
 });
-const result = await api.getShowVote(uuid);
-// result.data: ShowVoteResponse; result.status: number; result.headers: Headers
+const result = await api.getShowVote(new GetShowVoteRequest(uuid));
+// result.data: ShowVote; result.status: number; result.headers: Headers
 return json(result.data, result.status);
 ```
 
-The wrapper remains internal to the SDK: the public JSON remains the DV Live API response.
+The wrapper remains internal to the SDK: the public JSON is the mapped `result.data`.
+The SDK decodes DV Live responses in `sdk/src/responses/`, then converts them
+into public model instances through their static `fromResponse()` factories in
+`sdk/src/models/`. Customize output fields and transformations in those factories;
+the Edge Function receives and serializes the resulting model.
+Current models keep existing field names and omit additional upstream properties.
+Malformed response fields are rejected before DTO conversion.
 The actual status code is preserved. HTTP errors retain their original status and payload, including text payloads;
-body validation errors become `400`, network or decoding errors become `502`, and timeouts become `504`.
+request parameter or body validation errors become `400`, network or decoding errors become `502`, and timeouts become `504`.
 The default timeout is 15 seconds; no automatic retries are performed.
 
 Package structure, interfaces, errors, and usage: [sdk/README.md](sdk/README.md).

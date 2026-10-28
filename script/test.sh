@@ -39,20 +39,25 @@ test("all six modes forward method, encoded paths, body, auth and upstream statu
   ];
   for (const [mode, query, path, body] of cases) {
     let called = false;
+    const payload = mode === "getShowVote" ? { name: "Show", startDate: "2026-01-01", endDate: "2026-12-31" }
+      : mode === "getShowVoteChoice" ? { uuid: "choice", showVoteUuid: "show", firstname: "First", lastname: "Last", status: "ACTIVE", order: 1 }
+      : mode === "getVoter" ? { uniqRef: "voter", remainingPoints: 1, userFraudStatus: "CLEAN", balance: {} }
+      : { status: "success", code: 201, message: "Recorded", ...(mode === "createVoter" ? {} : { nbVoteRemaining: 1 }) };
     t.mock.method(globalThis, "fetch", async (url, options) => {
       called = true;
       assert.equal(url.href, `https://dev-webshow-engine.dv-live.com${path}`);
       assert.equal(options.method, body ? "POST" : "GET");
       assert.equal(options.headers.get("authorization"), "Bearer upstream-secret");
-      assert.equal(options.body, body ? JSON.stringify(body) : undefined);
+      if (body) assert.deepEqual(JSON.parse(options.body), body);
+      else assert.equal(options.body, undefined);
       assert.equal(options.redirect, "error");
-      return Response.json({ status: "success" }, { status: mode === "createVoter" ? 201 : 200 });
+      return Response.json(payload, { status: mode === "createVoter" ? 201 : 200 });
     });
     const handler = createHandler({ env });
     const response = await handler(request(`?mode=${mode}&${query}`, body ? { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer supabase-jwt" }, body: JSON.stringify(body) } : undefined));
     assert.equal(response.status, mode === "createVoter" ? 201 : 200);
     assert.ok(called, mode);
-    assert.deepEqual(await response.json(), { status: "success" });
+    assert.deepEqual(await response.json(), payload);
   }
 });
 
@@ -71,7 +76,7 @@ test("DVLIVE_ENV selects the SDK environment and rejects invalid values before H
   const urls = [];
   const upstream = t.mock.method(globalThis, "fetch", async (url) => {
     urls.push(url.href);
-    return Response.json({ name: "Show" });
+    return Response.json({ name: "Show", startDate: "2026-01-01", endDate: "2026-12-31" });
   });
   for (const environment of ["STAG", "PROD"]) {
     const handler = createHandler({ env: (key) => key === "DVLIVE_ENV" ? environment : undefined });
@@ -140,11 +145,26 @@ test("non-JSON upstream errors retain their original body, content type and stat
 });
 
 test("invalid upstream success JSON is a 502 response", async (t) => {
-  for (const text of ["", "{", "null", "[]"]) {
+  for (const text of ["", "{", "null", "[]", "{}", '{"name":"Show"}', '{"name":123,"startDate":"start","endDate":"end"}']) {
     t.mock.method(globalThis, "fetch", async () => new Response(text));
     const response = await createHandler({ env })(request("?mode=getShowVote&uuid=show"));
     assert.equal(response.status, 502);
     assert.deepEqual(await response.json(), { status: "error", code: 502, message: "DV Live API returned an invalid JSON response." });
+  }
+});
+
+test("every mode returns 502 for responses that do not match the SDK contract", async (t) => {
+  const handler = createHandler({ env });
+  for (const mode of ["getShowVote", "getShowVoteChoice", "getVoter", "createVoter", "addVote", "castVote"]) {
+    const post = ["createVoter", "addVote", "castVote"].includes(mode);
+    const body = mode === "castVote" ? { votes: [{ choiceUuid: "choice", nbVotes: 1 }] } : {};
+    const upstream = t.mock.method(globalThis, "fetch", async () => Response.json({ unexpected: true }));
+    const response = await handler(request(`?mode=${mode}&uuid=choice&showVoteUuid=show&userRef=voter`, post ? {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    } : {}));
+    assert.equal(response.status, 502, mode);
+    assert.equal((await response.json()).code, 502);
+    assert.equal(upstream.mock.callCount(), 1);
   }
 });
 
@@ -153,7 +173,7 @@ test("concurrent Edge Function requests keep their bearer tokens separate", asyn
   t.mock.method(globalThis, "fetch", async (_url, options) => {
     await Promise.resolve();
     seen.push(options.headers.get("authorization"));
-    return Response.json({ name: "Show" });
+    return Response.json({ name: "Show", startDate: "2026-01-01", endDate: "2026-12-31" });
   });
   const handler = createHandler({ env });
   const responses = await Promise.all(["first", "second"].map((token) => handler(request("?mode=getShowVote&uuid=show", { headers: { "bearer-token": token } }))));
@@ -174,7 +194,7 @@ test("network errors, timeout and missing secrets", async (t) => {
     const invalidConfig = createHandler({ env: () => value });
     const response = await invalidConfig(request("?mode=getShowVote&uuid=test"));
     assert.equal(response.status, 500);
-    assert.equal((await response.json()).message, 'Configure DVLIVE_ENV as "STAG" or "PROD" on the server.');
+    assert.equal((await response.json()).message, 'Invalid DVLive SDK configuration.');
   }
 });
 
@@ -227,7 +247,6 @@ test("SDK body validation errors are converted to HTTP 400", async (t) => {
     ["createVoter", { uniqRef: 1 }, "uniqRef must be a string."],
     ["createVoter", null, "The request body must be a JSON object."],
     ["addVote", { nbPoints: 0 }, "nbPoints must be a positive integer."],
-    ["addVote", { unexpected: true }, "Unknown body fields: unexpected."],
     ["castVote", { votes: [{ choiceUuid: "choice", nbVotes: 1 }], ip: null }, "ip must be a string."],
   ];
   for (const [mode, body, message] of cases) {
@@ -237,6 +256,19 @@ test("SDK body validation errors are converted to HTTP 400", async (t) => {
     assert.equal(response.headers.get("access-control-allow-origin"), "*");
   }
   assert.equal(upstream.mock.callCount(), 0);
+});
+
+test("SDK body decoding omits extra fields before forwarding to upstream", async (t) => {
+  const expected = { nbPoints: 1 };
+  t.mock.method(globalThis, "fetch", async (_url, options) => {
+    assert.deepEqual(JSON.parse(options.body), expected);
+    return Response.json({ status: "success", code: 201, message: "Recorded", nbVoteRemaining: 1 }, { status: 201 });
+  });
+  const response = await createHandler({ env })(request("?mode=addVote&showVoteUuid=show&userRef=voter", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...expected, unexpected: true, showVoteUuid: "ignored" }),
+  }));
+  assert.equal(response.status, 201);
 });
 
 test("Supabase auth is not reused as the DV Live token", async (t) => {

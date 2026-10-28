@@ -1,6 +1,8 @@
-/** Decoded upstream data and the original HTTP response metadata. */
-export interface ApiResponse<T> {
-  data: T;
-  status: number;
-  headers: Headers;
+/** Public DTO data and the original HTTP response metadata. */
+export class ApiResponse<T> {
+  constructor(
+    readonly data: T,
+    readonly status: number,
+    readonly headers: Headers,
+  ) {}
 }

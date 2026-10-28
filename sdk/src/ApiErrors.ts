@@ -35,14 +35,14 @@ export class ApiRequestError extends Error {
   }
 }
 
-/** A successful HTTP response could not be decoded as a JSON object. */
+/** A successful HTTP response could not be decoded into its response contract. */
 export class ApiResponseError extends Error {
   readonly status: number;
   readonly headers: Headers;
   readonly bodyText: string;
 
-  constructor(response: Response, bodyText: string) {
-    super("DV Live API returned an invalid JSON response.");
+  constructor(response: Pick<Response, "status" | "headers">, bodyText: string, cause?: unknown) {
+    super("DV Live API returned an invalid JSON response.", { cause });
     this.name = "ApiResponseError";
     this.status = response.status;
     this.headers = new Headers(response.headers);

@@ -1,25 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { setTimeout as delay } from "node:timers/promises";
-import { ApiService, ApiValidationError, ApiHttpError, ApiRequestError, ApiResponseError } from "../dist/index.js";
+import { GetShowVoteRequest, GetShowVoteChoiceRequest, GetVoterRequest, CreateVoterRequest, CreateVoterBody, ApiResponse, ShowVote, ShowVoteChoice, Voter, CreateVoterResult, AddVoteResult, CastVoteResult, ApiService, ApiValidationError, ApiHttpError, ApiRequestError, ApiResponseError } from "../dist/index.js";
 
 const config = { environment: "STAG", headers: { Authorization: "Bearer test-token" } };
-const show = { name: "Show", startDate: "2026-01-01", endDate: "2026-12-31", round: null };
-const choice = { uuid: "choice", showVoteUuid: "show", firstname: "First", lastname: "Last", status: "ACTIVE", order: 1, bio: null };
-const voter = { uniqRef: "a/b", remainingPoints: 3, userFraudStatus: "CLEAN", balance: { standardPoint: 3 } };
-const operation = { status: "success", code: 201, message: "Recorded" };
-const cases = [
-  ["getShowVote", ["a/b"], "/show-vote/a%2Fb", show],
-  ["getShowVoteChoice", ["choice"], "/show-vote-choice/choice", choice],
-  ["getVoter", ["show", "a/b ?#"], "/show-vote/show/voter/a%2Fb%20%3F%23", voter],
-  ["createVoter", ["show", { uniqRef: "a/b", phone: null }], "/show-vote/show/voter", operation],
-  ["addVote", ["show", "a/b", { nbPoints: 3, additionalVoteType: "VIDEO" }], "/show-vote/show/voter/a%2Fb/add-vote", { ...operation, nbVoteRemaining: 3 }],
-  ["castVote", ["show", "a/b", { votes: [{ choiceUuid: "choice", nbVotes: 1 }], sessionToken: "session" }], "/show-vote/show/voter/a%2Fb/vote", { ...operation, nbVoteRemaining: 2 }],
-];
+import { show, choice, voter, operation, cases } from "./responses.fixture.mjs";
 
 for (const [method, args, path, payload] of cases) {
   test(`${method}: encoded path, typed data, HTTP status and headers`, async (t) => {
-    const body = typeof args.at(-1) === "object" ? args.at(-1) : undefined;
+    const body = args[0].body;
     const status = body ? 201 : 200;
     const mock = t.mock.method(globalThis, "fetch", async (url, options) => {
       assert.equal(url.href, `https://dev-webshow-engine.dv-live.com${path}`);
@@ -33,7 +22,12 @@ for (const [method, args, path, payload] of cases) {
       return Response.json(payload, { status, headers: { "X-Request-Id": "request-1", "Retry-After": "10" } });
     });
     const result = await new ApiService(config)[method](...args);
-    assert.deepEqual(result.data, payload);
+    assert.deepEqual(JSON.parse(JSON.stringify(result.data)), payload);
+    assert.ok(result instanceof ApiResponse);
+    const Model = { getShowVote: ShowVote, getShowVoteChoice: ShowVoteChoice, getVoter: Voter,
+      createVoter: CreateVoterResult, addVote: AddVoteResult, castVote: CastVoteResult }[method];
+    assert.ok(result.data instanceof Model);
+    assert.deepEqual(Object.keys(result).sort(), ["data", "headers", "status"]);
     assert.equal(result.status, status);
     assert.ok(result.headers instanceof Headers);
     assert.equal(result.headers.get("x-request-id"), "request-1");
@@ -45,7 +39,7 @@ for (const [method, args, path, payload] of cases) {
 test("actual success status is preserved, including nonstandard upstream POST 200", async (t) => {
   for (const status of [200, 201]) {
     t.mock.method(globalThis, "fetch", async () => Response.json(operation, { status }));
-    assert.equal((await new ApiService(config).createVoter("show", {})).status, status);
+    assert.equal((await new ApiService(config).createVoter(new CreateVoterRequest("show", new CreateVoterBody()))).status, status);
   }
 });
 
@@ -56,7 +50,7 @@ test("HTTP failures preserve parsed document, raw text, statusText, headers and 
     const mock = t.mock.method(globalThis, "fetch", async () => new Response(bodyText, {
       status, statusText: "Upstream error", headers: { "Content-Type": "application/json", "Retry-After": "30" },
     }));
-    await assert.rejects(new ApiService(config).getShowVote("show"), (err) => {
+    await assert.rejects(new ApiService(config).getShowVote(new GetShowVoteRequest("show")), (err) => {
       assert.ok(err instanceof ApiHttpError);
       assert.equal(err.status, status);
       assert.equal(err.statusText, "Upstream error");
@@ -72,7 +66,7 @@ test("HTTP failures preserve parsed document, raw text, statusText, headers and 
 test("non-JSON and empty HTTP errors are HTTP errors, not decoding errors", async (t) => {
   for (const text of ["<html>Unavailable</html>", "", "null"]) {
     t.mock.method(globalThis, "fetch", async () => new Response(text, { status: 503, headers: { "Content-Type": "text/html" } }));
-    await assert.rejects(new ApiService(config).getShowVote("show"), (err) => {
+    await assert.rejects(new ApiService(config).getShowVote(new GetShowVoteRequest("show")), (err) => {
       assert.ok(err instanceof ApiHttpError);
       assert.equal(err.bodyText, text);
       assert.equal(err.document, text === "null" ? null : undefined);
@@ -84,7 +78,7 @@ test("non-JSON and empty HTTP errors are HTTP errors, not decoding errors", asyn
 test("successful invalid, empty and non-object JSON responses are decoding errors", async (t) => {
   for (const text of ["", "{", "null", "[]", '"text"', "false"]) {
     t.mock.method(globalThis, "fetch", async () => new Response(text, { status: 200 }));
-    await assert.rejects(new ApiService(config).getShowVote("show"), (err) => {
+    await assert.rejects(new ApiService(config).getShowVote(new GetShowVoteRequest("show")), (err) => {
       assert.ok(err instanceof ApiResponseError);
       assert.equal(err.status, 200);
       assert.equal(err.bodyText, text);
@@ -100,7 +94,7 @@ test("network errors while fetching or reading response bodies are classified", 
       if (!bodyFailure) throw cause;
       return new Response(new ReadableStream({ start(controller) { controller.error(cause); } }));
     });
-    await assert.rejects(new ApiService(config).getShowVote("show"), (err) => {
+    await assert.rejects(new ApiService(config).getShowVote(new GetShowVoteRequest("show")), (err) => {
       assert.ok(err instanceof ApiRequestError);
       assert.equal(err.kind, "network");
       assert.equal(err.cause, cause);
@@ -124,7 +118,7 @@ test("configured timeout applies to fetch and body reading", async (t) => {
       await delay(15);
       throw signal.reason;
     });
-    await assert.rejects(new ApiService({ ...config, timeoutMs: 1 }).getShowVote("show"), (err) => err instanceof ApiRequestError && err.kind === "timeout");
+    await assert.rejects(new ApiService({ ...config, timeoutMs: 1 }).getShowVote(new GetShowVoteRequest("show")), (err) => err instanceof ApiRequestError && err.kind === "timeout");
   }
 });
 
@@ -137,21 +131,21 @@ test("dynamic headers refresh on each call and concurrent clients keep their own
     return Response.json(show);
   });
   const api = new ApiService({ environment: config.environment, headers: () => ({ Authorization: token }) });
-  await api.getShowVote("show");
+  await api.getShowVote(new GetShowVoteRequest("show"));
   token = "second";
-  await api.getShowVote("show");
-  await Promise.all(["third", "fourth"].map((value) => new ApiService({ environment: config.environment, headers: { Authorization: value } }).getShowVote("show")));
+  await api.getShowVote(new GetShowVoteRequest("show"));
+  await Promise.all(["third", "fourth"].map((value) => new ApiService({ environment: config.environment, headers: { Authorization: value } }).getShowVote(new GetShowVoteRequest("show"))));
   assert.deepEqual(seen, ["first", "second", "third", "fourth"]);
 });
 
-test("invalid environment, configuration and path parameters fail before making a request", (t) => {
+test("invalid environment, configuration and path parameters fail before making a request", async (t) => {
   const mock = t.mock.method(globalThis, "fetch", () => { throw new Error("Unexpected request"); });
   for (const environment of ["", "stag", "prod", "DEV", "https://upstream.test", undefined, null, {}, "constructor", "__proto__"]) {
     assert.throws(() => new ApiService({ environment }), TypeError);
   }
   for (const timeoutMs of [0, -1, Infinity, 0.5]) assert.throws(() => new ApiService({ ...config, timeoutMs }), TypeError);
-  for (const value of ["", " ", ".", "..", undefined, null, 123]) assert.throws(() => new ApiService(config).getShowVote(value), ApiValidationError);
-  assert.throws(() => new ApiService(config).getVoter("show", undefined), ApiValidationError);
+  for (const value of ["", " ", ".", "..", undefined, null, 123]) assert.throws(() => new GetShowVoteRequest(value), ApiValidationError);
+  assert.throws(() => new GetVoterRequest("show", undefined), ApiValidationError);
   assert.equal(mock.mock.callCount(), 0);
 });
 
@@ -162,11 +156,61 @@ test("STAG and PROD choose their SDK base URLs without external URL configuratio
     return Response.json(show);
   });
   for (const environment of ["STAG", "PROD"]) {
-    await new ApiService({ environment }).getShowVote("show");
+    await new ApiService({ environment }).getShowVote(new GetShowVoteRequest("show"));
   }
   // Production uses its configured SDK host.
   assert.deepEqual(urls, [
     "https://dev-webshow-engine.dv-live.com/show-vote/show",
     "https://webshow-engine.dv-live.com/show-vote/show",
   ]);
+});
+
+test("each endpoint maps only public response fields", async (t) => {
+  for (const [method, args, , payload] of cases) {
+    t.mock.method(globalThis, "fetch", async () => Response.json({ ...payload, upstreamOnly: "private" }));
+    const result = await new ApiService(config)[method](...args);
+    assert.deepEqual(JSON.parse(JSON.stringify(result.data)), payload);
+    assert.ok(result instanceof ApiResponse);
+    const Model = { getShowVote: ShowVote, getShowVoteChoice: ShowVoteChoice, getVoter: Voter,
+      createVoter: CreateVoterResult, addVote: AddVoteResult, castVote: CastVoteResult }[method];
+    assert.ok(result.data instanceof Model);
+    assert.deepEqual(Object.keys(result).sort(), ["data", "headers", "status"]);
+    assert.equal(Object.hasOwn(result.data, "upstreamOnly"), false);
+  }
+});
+
+test("nested mappings preserve nulls and absent optional fields and omit upstream extras", async (t) => {
+  const nestedChoice = { uuid: "choice", firstname: "First", lastname: "Last", bio: null };
+  const round = { currentRound: 1, startDay: "2026-01-01", endDay: "2026-01-02", name: "Round", choices: [nestedChoice] };
+  t.mock.method(globalThis, "fetch", async () => Response.json({
+    ...show, round: { ...round, upstreamOnly: true, choices: [{ ...nestedChoice, upstreamOnly: true }] },
+  }));
+  assert.deepEqual(JSON.parse(JSON.stringify((await new ApiService(config).getShowVote(new GetShowVoteRequest("show"))).data)), { ...show, round });
+
+  for (const optional of [{}, { round: null }]) {
+    const payload = { name: "Show", startDate: "2026-01-01", endDate: "2026-12-31", ...optional };
+    t.mock.method(globalThis, "fetch", async () => Response.json(payload));
+    assert.deepEqual(JSON.parse(JSON.stringify((await new ApiService(config).getShowVote(new GetShowVoteRequest("show"))).data)), payload);
+  }
+
+  const participant = { ...choice, eliminatedRound: { uuid: "round", round: 1 }, reintroducedRound: null };
+  t.mock.method(globalThis, "fetch", async () => Response.json({
+    ...participant, eliminatedRound: { ...participant.eliminatedRound, upstreamOnly: true },
+  }));
+  assert.deepEqual(JSON.parse(JSON.stringify((await new ApiService(config).getShowVoteChoice(new GetShowVoteChoiceRequest("choice"))).data)), participant);
+
+  const payload = { ...voter, email: null, phone: null, balance: { standardPoint: 0, additionalPoint: 2 } };
+  t.mock.method(globalThis, "fetch", async () => Response.json({ ...payload, balance: { ...payload.balance, upstreamOnly: true } }));
+  assert.deepEqual(JSON.parse(JSON.stringify((await new ApiService(config).getVoter(new GetVoterRequest("show", "voter"))).data)), payload);
+});
+
+test("unmappable nested responses retain HTTP context in ApiResponseError", async (t) => {
+  const payload = { ...show, round: { choices: null } };
+  t.mock.method(globalThis, "fetch", async () => Response.json(payload));
+  await assert.rejects(new ApiService(config).getShowVote(new GetShowVoteRequest("show")), (error) => {
+    assert.ok(error instanceof ApiResponseError);
+    assert.equal(error.status, 200);
+    assert.deepEqual(JSON.parse(error.bodyText), payload);
+    return true;
+  });
 });

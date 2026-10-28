@@ -1,10 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ApiMode, API_MODES, parseMode, getModeCatalog } from "@digitalvirgo/dvlive-api";
+import { ApiModes, API_MODES, parseMode, getModeCatalog } from "@digitalvirgo/dvlive-api";
 
 test("every supported query value parses into its SDK enum member", () => {
-  assert.deepEqual(Object.values(ApiMode).sort(), ["addVote", "castVote", "createVoter", "getShowVote", "getShowVoteChoice", "getVoter"]);
-  for (const mode of Object.values(ApiMode)) {
+  assert.deepEqual(Object.values(ApiModes).sort(), ["addVote", "castVote", "createVoter", "getShowVote", "getShowVoteChoice", "getVoter"]);
+  for (const mode of Object.values(ApiModes)) {
     assert.deepEqual(parseMode(mode), { mode, catalog: null });
   }
 });
@@ -18,24 +18,27 @@ test("missing, empty and invalid modes return the complete catalog", () => {
 
 test("catalog includes each mode's description, HTTP method and required parameters", () => {
   const expected = {
-    [ApiMode.GetShowVote]: ["GET", ["uuid"]],
-    [ApiMode.GetShowVoteChoice]: ["GET", ["uuid"]],
-    [ApiMode.GetVoter]: ["GET", ["showVoteUuid", "userRef"]],
-    [ApiMode.CreateVoter]: ["POST", ["showVoteUuid"]],
-    [ApiMode.AddVote]: ["POST", ["showVoteUuid", "userRef"]],
-    [ApiMode.CastVote]: ["POST", ["showVoteUuid", "userRef"]],
+    [ApiModes.GetShowVote]: ["GET", ["uuid"]],
+    [ApiModes.GetShowVoteChoice]: ["GET", ["uuid"]],
+    [ApiModes.GetVoter]: ["GET", ["showVoteUuid", "userRef"]],
+    [ApiModes.CreateVoter]: ["POST", ["showVoteUuid"]],
+    [ApiModes.AddVote]: ["POST", ["showVoteUuid", "userRef"]],
+    [ApiModes.CastVote]: ["POST", ["showVoteUuid", "userRef"]],
   };
   const catalog = getModeCatalog();
   assert.equal(catalog.name, "DVLive");
   assert.equal(catalog.modes, API_MODES);
-  assert.equal(Object.keys(catalog.modes).length, Object.values(ApiMode).length);
+  assert.equal(Object.keys(catalog.modes).length, Object.values(ApiModes).length);
   for (const [mode, [method, params]] of Object.entries(expected)) {
     const definition = catalog.modes[mode];
     assert.equal(definition.method, method);
     assert.deepEqual(definition.params, params);
     assert.match(definition.description, /^(Returns|Registers|Credits|Casts) /);
-    assert.ok(definition.response.endsWith("Response"));
+    assert.equal(definition.response, {
+      getShowVote: "ShowVote", getShowVoteChoice: "ShowVoteChoice", getVoter: "Voter",
+      createVoter: "CreateVoterResult", addVote: "AddVoteResult", castVote: "CastVoteResult",
+    }[mode]);
     assert.ok(Array.isArray(definition.body));
   }
-  assert.deepEqual(catalog.modes[ApiMode.CastVote].requiredBody, ["votes"]);
+  assert.deepEqual(catalog.modes[ApiModes.CastVote].requiredBody, ["votes"]);
 });

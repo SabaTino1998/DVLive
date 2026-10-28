@@ -1,5 +1,5 @@
 /** Supported operations. Values match the public mode query parameter. */
-export enum ApiMode {
+export enum ApiModes {
   GetShowVoteChoice = "getShowVoteChoice",
   GetShowVote = "getShowVote",
   CreateVoter = "createVoter",
@@ -19,38 +19,38 @@ export interface ApiModeDefinition {
   readonly response: string;
 }
 
-export const API_MODES: Readonly<Record<ApiMode, ApiModeDefinition>> = {
-  [ApiMode.GetShowVoteChoice]: {
+export const API_MODES: Readonly<Record<ApiModes, ApiModeDefinition>> = {
+  [ApiModes.GetShowVoteChoice]: {
     method: "GET", params: ["uuid"], body: [],
     description: "Returns a participant: UUID, name, status, order, biography, images, and elimination/reintroduction rounds.",
-    response: "ShowVoteChoiceResponse",
+    response: "ShowVoteChoice",
   },
-  [ApiMode.GetShowVote]: {
+  [ApiModes.GetShowVote]: {
     method: "GET", params: ["uuid"], body: [],
     description: "Returns the show name and dates, current round, and its participants.",
-    response: "ShowVoteResponse",
+    response: "ShowVote",
   },
-  [ApiMode.CreateVoter]: {
+  [ApiModes.CreateVoter]: {
     method: "POST", params: ["showVoteUuid"], body: ["email", "phone", "uniqRef"],
     description: "Registers a voter and returns the operation result (status, code, message).",
-    response: "CreateVoterResponse",
+    response: "CreateVoterResult",
   },
-  [ApiMode.GetVoter]: {
+  [ApiModes.GetVoter]: {
     method: "GET", params: ["showVoteUuid", "userRef"], body: [],
     description: "Returns the voter reference and contact details, remaining points, fraud status, and balance breakdown.",
-    response: "GetVoterResponse",
+    response: "Voter",
   },
-  [ApiMode.AddVote]: {
+  [ApiModes.AddVote]: {
     method: "POST", params: ["showVoteUuid", "userRef"], body: ["additionalVoteType", "nbPoints"],
     description: "Credits additional votes and returns the operation result, including nbVoteRemaining when provided by the API.",
-    response: "AddVoteResponse",
+    response: "AddVoteResult",
   },
-  [ApiMode.CastVote]: {
+  [ApiModes.CastVote]: {
     method: "POST", params: ["showVoteUuid", "userRef"],
     body: ["votes", "sessionToken", "phoneFingerPrint", "ip", "userAgent", "uniqSubscriptionId"],
     requiredBody: ["votes"],
     description: "Casts votes for participants in the current round and returns the operation result, including nbVoteRemaining when provided by the API.",
-    response: "CastVoteResponse",
+    response: "CastVoteResult",
   },
 };
 
@@ -58,11 +58,11 @@ export const API_MODES: Readonly<Record<ApiMode, ApiModeDefinition>> = {
 export interface ModeCatalog {
   name: "DVLive";
   description: string;
-  modes: Readonly<Record<ApiMode, ApiModeDefinition>>;
+  modes: Readonly<Record<ApiModes, ApiModeDefinition>>;
 }
 
 export type ModeParseResult =
-  | { mode: ApiMode; catalog: null }
+  | { mode: ApiModes; catalog: null }
   | { mode: null; catalog: ModeCatalog };
 
 export function getModeCatalog(): ModeCatalog {
@@ -75,6 +75,6 @@ export function getModeCatalog(): ModeCatalog {
 
 /** Exact, case-sensitive parsing. Missing or unsupported modes return the catalog. */
 export function parseMode(value: string | null | undefined): ModeParseResult {
-  const mode = Object.values(ApiMode).find((mode) => mode === value);
+  const mode = Object.values(ApiModes).find((mode) => mode === value);
   return mode === undefined ? { mode: null, catalog: getModeCatalog() } : { mode, catalog: null };
 }
