@@ -44,9 +44,9 @@ FN="${SUPABASE_URL%/}/functions/v1/dvlive"
 TMP=$(mktemp)
 trap 'rm -f "$TMP"' EXIT
 
-# dvlive_request MODE METHOD QUERY_JSON [BODY_JSON] [EXPECTED_STATUS]
+# dvlive_request MODE METHOD QUERY_JSON [BODY_JSON] [EXPECTED_STATUS] [REQUIRE_TOKEN]
 dvlive_request() {
-  local mode=$1 method=$2 params=$3 body=${4-} expected=${5:-200}
+  local mode=$1 method=$2 params=$3 body=${4-} expected=${5:-200} require_token=${6:-true}
   local url=$FN key value
   local -a options=(--silent --show-error --connect-timeout 10 --max-time 60
     --request "$method" --output "$TMP" --write-out '%{http_code}'
@@ -54,8 +54,10 @@ dvlive_request() {
     --header "Authorization: Bearer $SUPABASE_ANON_KEY"
     --header "apikey: $SUPABASE_ANON_KEY")
   if [[ -n "$mode" ]]; then
-    [[ -n "${DVLIVE_BEARER_TOKEN:-}" ]] || { echo 'FAIL: set DVLIVE_BEARER_TOKEN in script/smoke-dvlive-common.sh' >&2; exit 1; }
-    options+=(--header "bearer-token: $DVLIVE_BEARER_TOKEN")
+    if [[ "$require_token" == true ]]; then
+      [[ -n "${DVLIVE_BEARER_TOKEN:-}" ]] || { echo 'FAIL: set DVLIVE_BEARER_TOKEN in script/smoke-dvlive-common.sh' >&2; exit 1; }
+      options+=(--header "bearer-token: $DVLIVE_BEARER_TOKEN")
+    fi
     url+="?mode=$(jq -rn --arg value "$mode" '$value | @uri')"
   fi
   while IFS= read -r key; do

@@ -5,3 +5,5 @@ node_modules/
 !.env.example
 supabase/.temp/
 supabase/.branches/
+sdk/dist/
+*.tsbuildinfo

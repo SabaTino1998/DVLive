@@ -1,0 +1,23 @@
+{
+  "name": "@digitalvirgo/dvlive-api",
+  "version": "0.1.0",
+  "description": "Typed DV Live voting API SDK",
+  "type": "module",
+  "license": "ISC",
+  "engines": { "node": ">=18" },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" }
+  },
+  "files": ["dist", "README.md"],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit && tsc -p test/tsconfig.json",
+    "test": "npm run build && node --test test/*.test.mjs && npm run check:package",
+    "check:package": "tsc --strict --module NodeNext --target ES2022 --noEmit test/package-types.test.ts",
+    "prepack": "npm run build"
+  },
+  "devDependencies": { "typescript": "5.9.3" }
+}

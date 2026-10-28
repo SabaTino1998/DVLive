@@ -1,18 +1,31 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
+npm --prefix sdk run check
+npm --prefix sdk test
 node --input-type=module - <<'NODE'
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { createHandler } from "./supabase/functions/dvlive/index.ts";
+import { registerHooks } from "node:module";
 
-const env = (key) => ({ DVLIVE_BASE_URL: "https://upstream.test/api/" })[key];
+// Resolve the same SDK alias as Deno, without installing an unpublished npm package.
+const denoConfigUrl = new URL("./supabase/functions/dvlive/deno.json", import.meta.url);
+const importMap = JSON.parse(await readFile(denoConfigUrl, "utf8")).imports;
+const sdkSourceUrl = new URL(importMap["@digitalvirgo/dvlive-api"], denoConfigUrl);
+// Use the built SDK in Node: TypeScript enums require compilation, unlike Deno.
+const sdkUrl = new URL("../dist/index.js", sdkSourceUrl).href;
+registerHooks({ resolve(specifier, context, next) {
+  return next(specifier === "@digitalvirgo/dvlive-api" ? sdkUrl : specifier, context);
+} });
+const { createHandler } = await import("./supabase/functions/dvlive/index.ts");
+
+const env = (key) => ({ DVLIVE_ENV: "STAG" })[key];
 const request = (query = "", options = {}) => new Request(`http://localhost/functions/v1/dvlive${query}`, { ...options, headers: { Authorization: "Bearer supabase-jwt", "bearer-token": "upstream-secret", ...options.headers } });
 
 test("all six modes forward method, encoded paths, body, auth and upstream status", async (t) => {
@@ -28,9 +41,9 @@ test("all six modes forward method, encoded paths, body, auth and upstream statu
     let called = false;
     t.mock.method(globalThis, "fetch", async (url, options) => {
       called = true;
-      assert.equal(url.href, `https://upstream.test/api${path}`);
+      assert.equal(url.href, `https://dev-webshow-engine.dv-live.com${path}`);
       assert.equal(options.method, body ? "POST" : "GET");
-      assert.equal(options.headers.Authorization, "Bearer upstream-secret");
+      assert.equal(options.headers.get("authorization"), "Bearer upstream-secret");
       assert.equal(options.body, body ? JSON.stringify(body) : undefined);
       assert.equal(options.redirect, "error");
       return Response.json({ status: "success" }, { status: mode === "createVoter" ? 201 : 200 });
@@ -54,6 +67,99 @@ test("upstream failures preserve status, payload and Retry-After", async (t) => 
   }
 });
 
+test("DVLIVE_ENV selects the SDK environment and rejects invalid values before HTTP calls", async (t) => {
+  const urls = [];
+  const upstream = t.mock.method(globalThis, "fetch", async (url) => {
+    urls.push(url.href);
+    return Response.json({ name: "Show" });
+  });
+  for (const environment of ["STAG", "PROD"]) {
+    const handler = createHandler({ env: (key) => key === "DVLIVE_ENV" ? environment : undefined });
+    assert.equal((await handler(request("?mode=getShowVote&uuid=show"))).status, 200);
+  }
+  assert.deepEqual(urls, ["https://dev-webshow-engine.dv-live.com/show-vote/show", "https://webshow-engine.dv-live.com/show-vote/show"]);
+  const count = upstream.mock.callCount();
+  for (const environment of [undefined, "", "DEV", "prod"]) {
+    const handler = createHandler({ env: () => environment });
+    assert.equal((await handler(request("?mode=getShowVote&uuid=show"))).status, 500);
+    assert.equal((await handler(request())).status, 200);
+  }
+  assert.equal(upstream.mock.callCount(), count);
+});
+
+test("missing or unparseable modes return the SDK catalog without authentication or upstream calls", async (t) => {
+  const upstream = t.mock.method(globalThis, "fetch", () => { throw new Error("Unexpected HTTP request"); });
+  const { getModeCatalog } = await import(sdkUrl);
+  const handler = createHandler({ env: () => undefined });
+  for (const query of ["", "?mode=", "?mode=unknown", "?mode=constructor", "?mode=__proto__", "?mode=toString", "?mode=GETSHOWVOTE"]) {
+    for (const method of ["GET", "POST"]) {
+      const response = await handler(new Request(`http://localhost/functions/v1/dvlive${query}`, {
+        method, ...(method === "POST" ? { body: "invalid JSON" } : {}),
+      }));
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.get("access-control-allow-origin"), "*");
+      assert.deepEqual(await response.json(), getModeCatalog());
+    }
+  }
+  assert.equal(upstream.mock.callCount(), 0);
+  const preflight = await handler(new Request("http://localhost/functions/v1/dvlive", { method: "OPTIONS" }));
+  assert.equal(preflight.status, 204);
+});
+
+test("SDK results remain unwrapped and only approved upstream headers are forwarded", async (t) => {
+  const payload = { status: "success", code: 201, message: "Recorded", nbVoteRemaining: 2 };
+  const handler = createHandler({ env });
+  for (const status of [200, 201]) {
+    t.mock.method(globalThis, "fetch", async () => Response.json(payload, { status, headers: {
+      "Retry-After": "15", "Set-Cookie": "private=value", "X-Upstream-Internal": "private",
+    } }));
+    const response = await handler(request("?mode=addVote&showVoteUuid=show&userRef=voter", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: '{"nbPoints":1}',
+    }));
+    assert.equal(response.status, status);
+    assert.deepEqual(await response.json(), payload);
+    assert.equal(response.headers.get("retry-after"), "15");
+    assert.equal(response.headers.get("set-cookie"), null);
+    assert.equal(response.headers.get("x-upstream-internal"), null);
+  }
+});
+
+test("non-JSON upstream errors retain their original body, content type and status", async (t) => {
+  for (const text of ["<html>Unavailable</html>", ""]) {
+    t.mock.method(globalThis, "fetch", async () => new Response(text, {
+      status: 503, headers: { "Content-Type": "text/html", "Retry-After": "10", "Set-Cookie": "private=value" },
+    }));
+    const response = await createHandler({ env })(request("?mode=getShowVote&uuid=show"));
+    assert.equal(response.status, 503);
+    assert.equal(response.headers.get("content-type"), "text/html");
+    assert.equal(response.headers.get("retry-after"), "10");
+    assert.equal(response.headers.get("set-cookie"), null);
+    assert.equal(await response.text(), text);
+  }
+});
+
+test("invalid upstream success JSON is a 502 response", async (t) => {
+  for (const text of ["", "{", "null", "[]"]) {
+    t.mock.method(globalThis, "fetch", async () => new Response(text));
+    const response = await createHandler({ env })(request("?mode=getShowVote&uuid=show"));
+    assert.equal(response.status, 502);
+    assert.deepEqual(await response.json(), { status: "error", code: 502, message: "DV Live API returned an invalid JSON response." });
+  }
+});
+
+test("concurrent Edge Function requests keep their bearer tokens separate", async (t) => {
+  const seen = [];
+  t.mock.method(globalThis, "fetch", async (_url, options) => {
+    await Promise.resolve();
+    seen.push(options.headers.get("authorization"));
+    return Response.json({ name: "Show" });
+  });
+  const handler = createHandler({ env });
+  const responses = await Promise.all(["first", "second"].map((token) => handler(request("?mode=getShowVote&uuid=show", { headers: { "bearer-token": token } }))));
+  assert.deepEqual(responses.map((response) => response.status), [200, 200]);
+  assert.deepEqual(seen, ["Bearer first", "Bearer second"]);
+});
+
 test("network errors, timeout and missing secrets", async (t) => {
   for (const [name, status] of [["TypeError", 502], ["TimeoutError", 504]]) {
     t.mock.method(globalThis, "fetch", async () => { throw new DOMException("failure", name); });
@@ -63,16 +169,47 @@ test("network errors, timeout and missing secrets", async (t) => {
   const handler = createHandler({ env: () => undefined });
   assert.equal((await handler(request("?mode=getShowVote&uuid=test"))).status, 500);
   assert.equal((await handler(request())).status, 200);
+    for (const value of ["", "stag", "DEV", "constructor"]) {
+    const invalidConfig = createHandler({ env: () => value });
+    const response = await invalidConfig(request("?mode=getShowVote&uuid=test"));
+    assert.equal(response.status, 500);
+    assert.equal((await response.json()).message, 'Configure DVLIVE_ENV as "STAG" or "PROD" on the server.');
+  }
 });
 
 test("validation rejects invalid inputs without calling upstream", async (t) => {
   const upstream = t.mock.method(globalThis, "fetch", () => { throw new Error("Unexpected upstream call"); });
   const handler = createHandler({ env });
-  for (const mode of ["__proto__", "constructor", "toString"]) assert.equal((await handler(request(`?mode=${mode}`))).status, 400);
+
   for (const [body, status] of [["{", 400], ["[]", 400], ['{"unexpected":1}', 400], ['{"votes":[]}', 400]]) {
     assert.equal((await handler(request("?mode=castVote&showVoteUuid=show&userRef=voter", { method: "POST", headers: { "Content-Type": "application/json" }, body }))).status, status);
   }
   assert.equal((await handler(request("?mode=createVoter&showVoteUuid=show", { method: "POST", body: "{}" }))).status, 415);
+  assert.equal((await handler(request("?mode=getVoter&showVoteUuid=show&userRef=.."))).status, 400);
+  for (const [mode, body] of [["createVoter", { phone: 123 }], ["addVote", { nbPoints: -1 }], ["addVote", { additionalVoteType: "INVALID" }], ["addVote", { additionalVoteType: ["VIDEO"] }], ["castVote", { votes: [{ choiceUuid: "choice", nbVotes: 1 }], ip: false }]]) {
+    const response = await handler(request(`?mode=${mode}&showVoteUuid=show&userRef=voter`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }));
+    assert.equal(response.status, 400);
+  }
+  assert.equal(upstream.mock.callCount(), 0);
+});
+
+test("SDK body validation errors are converted to HTTP 400", async (t) => {
+  const upstream = t.mock.method(globalThis, "fetch", () => { throw new Error("Unexpected HTTP request"); });
+  const handler = createHandler({ env });
+  const cases = [
+    ["createVoter", { email: false }, "email must be a string."],
+    ["createVoter", { uniqRef: 1 }, "uniqRef must be a string."],
+    ["createVoter", null, "The request body must be a JSON object."],
+    ["addVote", { nbPoints: 0 }, "nbPoints must be a positive integer."],
+    ["addVote", { unexpected: true }, "Unknown body fields: unexpected."],
+    ["castVote", { votes: [{ choiceUuid: "choice", nbVotes: 1 }], ip: null }, "ip must be a string."],
+  ];
+  for (const [mode, body, message] of cases) {
+    const response = await handler(request(`?mode=${mode}&showVoteUuid=show&userRef=voter`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }));
+    assert.equal(response.status, 400);
+    assert.deepEqual(await response.json(), { status: "error", code: 400, message });
+    assert.equal(response.headers.get("access-control-allow-origin"), "*");
+  }
   assert.equal(upstream.mock.callCount(), 0);
 });
 
@@ -97,6 +234,9 @@ test("each mode smoke script exercises only its own mode through curl adapter", 
     await writeFile(join(dir, "curl"), `#!/usr/bin/env node
 const { writeFile } = require("node:fs/promises");
 (async () => {
+  require("node:module").registerHooks({ resolve(specifier, context, next) {
+    return next(specifier === "@digitalvirgo/dvlive-api" ? ${JSON.stringify(sdkUrl)} : specifier, context);
+  } });
   const { createHandler } = await import(${JSON.stringify(handlerUrl)});
   const args = process.argv.slice(2), headers = {};
   let method, body, output, dump, url;
@@ -113,21 +253,22 @@ const { writeFile } = require("node:fs/promises");
   }
   if (headers.Authorization !== "Bearer supabase-jwt" || headers.apikey !== "supabase-jwt") throw new Error("Wrong Supabase auth");
   const selectedMode = new URL(url).searchParams.get("mode");
-  if (process.env.EXPECTED_MODE === "catalog" ? (selectedMode && selectedMode !== "unknown") : selectedMode !== process.env.EXPECTED_MODE) {
+  const { parseMode } = await import(${JSON.stringify(sdkUrl)});
+  if (process.env.EXPECTED_MODE === "catalog" ? parseMode(selectedMode).mode !== null : selectedMode !== process.env.EXPECTED_MODE) {
     throw new Error("Smoke script called another mode: " + selectedMode);
   }
   globalThis.fetch = async (url, options) => {
-      if (options.headers.Authorization !== "Bearer test-token") throw new Error("Wrong upstream auth");
+      if (options.headers.get("authorization") !== "Bearer test-token") throw new Error("Wrong upstream auth");
       if (url.pathname.includes("a/b")) throw new Error("Unescaped userRef");
       const payload = options.body ? JSON.parse(options.body) : null;
       if (selectedMode === "createVoter" && payload.uniqRef !== "a/b") throw new Error("Wrong voter");
       if (selectedMode === "addVote" && payload.nbPoints !== 3) throw new Error("Wrong points");
       if (selectedMode === "castVote" && payload.votes[0].choiceUuid !== "choice") throw new Error("Wrong votes");
-      return Response.json({ status: "success", code: 200, message: "Success", showVoteUuid: "show", uuid: "choice", firstname: "First", lastname: "Last", order: 1,
+      return Response.json({ status: "success", code: options.method === "POST" ? 201 : 200, message: "Success", nbVoteRemaining: 2, showVoteUuid: "show", uuid: "choice", firstname: "First", lastname: "Last", order: 1,
         name: "Show", startDate: "2026-01-01", endDate: "2026-12-31", uniqRef: "a/b", remainingPoints: 1, userFraudStatus: "CLEAN", balance: {}
-      }, { status: options.method === "POST" && url.pathname.endsWith("/voter") ? 201 : 200 });
+      }, { status: options.method === "POST" ? 201 : 200 });
   };
-  const handler = createHandler({ env: () => "https://upstream.test" });
+  const handler = createHandler({ env: () => "STAG" });
   const response = await handler(new Request(url, { method, headers, ...(body === undefined ? {} : { body }) }));
   await writeFile(output, await response.text());
   process.stdout.write(String(response.status));
@@ -155,12 +296,11 @@ const { writeFile } = require("node:fs/promises");
       assert.ok(help.includes(script));
       await assert.rejects(run("bash", [script, "--unknown"]));
       if (mode !== "catalog") {
-        await assert.rejects(run("bash", [script], { env: { ...testEnv, DVLIVE_BEARER_TOKEN: "" } }));
+        await assert.rejects(run("bash", [script], { env: { ...testEnv, DVLIVE_BEARER_TOKEN: " " } }));
       }
     }
     const outputPath = join(dir, "result.json");
     await run("bash", ["script/smoke-get-show-vote.sh"], { env: { ...environment, EXPECTED_MODE: "getShowVote", OUT_FILE: outputPath } });
-    const { readFile } = await import("node:fs/promises");
     assert.equal(JSON.parse(await readFile(outputPath, "utf8")).name, "Show");
     await assert.rejects(run("bash", ["script/smoke-add-vote.sh"], { env: { ...environment, NB_POINTS: "-1" } }));
     await assert.rejects(run("bash", ["script/smoke-cast-vote.sh"], { env: { ...environment, VOTES: "[]" } }));

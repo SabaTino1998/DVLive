@@ -31,9 +31,9 @@ Poi eseguire dalla root del repository:
 | `smoke-get-show-vote-choice.sh` | `getShowVoteChoice` | UUID, show, nome, stato e ordine del partecipante |
 | `smoke-get-voter.sh` | `getVoter` | Riferimento, punti, stato antifrode e saldo |
 | `smoke-create-voter.sh` | `createVoter` | HTTP 201 ed esito registrazione |
-| `smoke-add-vote.sh` | `addVote` | HTTP 200 ed esito accredito |
-| `smoke-cast-vote.sh` | `castVote` | HTTP 200 ed esito voto |
-| `smoke-catalog.sh` | Nessuna | Catalogo completo con descrizioni delle sei mode |
+| `smoke-add-vote.sh` | `addVote` | HTTP 201 ed esito accredito |
+| `smoke-cast-vote.sh` | `castVote` | HTTP 201 ed esito voto |
+| `smoke-catalog.sh` | Assente o non valida | Catalogo completo, descrizioni in inglese e parametri richiesti |
 
 Le mode rimangono nei parametri URL. Le operazioni GET non inviano un body;
 le operazioni POST inviano JSON. Le risposte dell'API DV Live rimangono inalterate,
@@ -53,17 +53,24 @@ indicato, sostituendolo se esiste; altrimenti viene stampato.
 | `CHOICE_UUID` | `22222222-2222-4222-8222-222222222201` (esempio del runner) |
 | `USER_REF` | `dvlive-smoke` |
 | `OUT_FILE` | Opzionale: esporta la risposta JSON |
-| `EXPECTED_STATUS` | Opzionale per POST: 201 per creazione, 200 per accredito/voto |
+| `EXPECTED_STATUS` | Opzionale per POST: 201 per tutte le operazioni POST |
 
 Sostituire gli identificativi di esempio con risorse esistenti nell'ambiente scelto.
-Il catalogo non richiede il token DV Live; richiede comunque l'autenticazione Supabase.
+Il catalogo viene restituito con HTTP 200 se `mode` manca o il parser dell'SDK non
+la riconosce. Include descrizioni in inglese e parametri richiesti; lo smoke test
+verifica il caso senza mode e i valori non validi `unknown` e `__proto__`.
+Il catalogo non richiede il token DV Live. L'autenticazione del gateway dipende
+da `verify_jwt` nel progetto Supabase; gli script inviano comunque gli header Supabase.
 Per progetti remoti inserire URL e chiave Supabase nel blocco condiviso di
 `smoke-dvlive-common.sh`.
 
-La chiave deve essere accettata dalla verifica JWT del gateway (per esempio la chiave
-anon JWT legacy). Le nuove chiavi publishable non sono JWT.
-L'unica variabile server in `supabase/.env` è `DVLIVE_BASE_URL`, caricata passando
-`--env-file supabase/.env` a `supabase functions serve dvlive`.
+Quando la verifica JWT del gateway è abilitata, usare un JWT accettato dal progetto,
+per esempio una chiave anon JWT legacy. Le nuove chiavi publishable non sono JWT.
+L'unica variabile server in `supabase/.env` è `DVLIVE_ENV=STAG` oppure
+`DVLIVE_ENV=PROD`, caricata passando `--env-file supabase/.env` a
+`supabase functions serve dvlive`. L'SDK configura il base URL: `STAG` usa
+`https://dev-webshow-engine.dv-live.com`, `PROD` usa `https://webshow-engine.dv-live.com`. Il token DV Live resta
+nella configurazione comune degli smoke test e viene passato nelle chiamate.
 Non occorre un file JSON di configurazione per gli smoke test.
 
 ## Operazioni POST
@@ -93,8 +100,13 @@ I campi antifrode opzionali sono `SESSION_TOKEN`, `PHONE_FINGER_PRINT`, `IP`,
 ## Verifica locale
 
 ```sh
+npm ci --prefix sdk
 ./script/test.sh
 ```
 
 Richiede anche Node.js >=22.18 per importare direttamente `index.ts`.
-Verifica il proxy e ogni smoke test con upstream simulato, senza rete o credenziali reali.
+Compila l'SDK, verifica i tipi e il pacchetto ESM, poi testa il proxy e ogni smoke
+test con upstream simulato, senza chiamate HTTP reali o creazione di voti.
+Gli status POST predefiniti sono `201`, come nell'OpenAPI; `EXPECTED_STATUS` permette
+di testarli anche contro ambienti che restituiscono uno status differente.
+I parametri locali e le credenziali condivise non vengono modificati dalla suite.
