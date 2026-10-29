@@ -5,6 +5,21 @@
 - `supabase/`: single **DVLive** Edge Function and backend configuration.
 - `script/`: individual smoke tests; `add-vote` calls DV Live directly, other voting operations use Supabase.
 
+## App Expo (React Native)
+
+La cartella `web/` contiene l’app Expo SDK 54 per web, iOS e Android, con
+inizializzazione SmartUser nel client come in Bravigo.
+
+```sh
+cd web
+npm install
+npm run web
+```
+
+Expo carica `web/.env` automaticamente. Il sito è normalmente su
+`http://localhost:8081`. La vecchia applicazione Vite/Express è stata sostituita.
+Setup e flussi sono descritti in [web/README.md](web/README.md).
+
 ## Runner
 
 ```sh

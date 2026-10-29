@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Local configuration: edit the defaults after :- below; no export is needed.
 SHOW_VOTE_UUID="${SHOW_VOTE_UUID:-11111111-1111-4111-8111-111111111101}"
-USER_REF="${USER_REF:-N_35c4251d9ca734b136a4}" # Paste the N_ token returned by smoke-smartuser-token.sh.
+USER_REF="${USER_REF:-N_1315086627ff72ae0df6}" # Paste the N_ token returned by smoke-smartuser-token.sh.
 OUT_FILE="${OUT_FILE:-}"
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/smoke-dvlive-common.sh"
