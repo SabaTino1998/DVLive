@@ -7,3 +7,4 @@ supabase/.temp/
 supabase/.branches/
 sdk/dist/
 *.tsbuildinfo
+test-support/.npmrc

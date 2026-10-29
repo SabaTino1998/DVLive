@@ -1,15 +1,6 @@
 import { ApiValidationError } from "../ApiErrors.ts";
 import { bodyObject, string, optionalString as decodeOptionalString, optionalPhone, number } from "./body-decoding.ts";
 import { pathParameter, optionalString, positiveInteger } from "./validation.ts";
-export type AdditionalVoteType = "PURCHASE" | "SPONSOR" | "VIDEO" | "GAME" | "REFERAL" | "PROMO";
-
-function decodeVoteType(value: unknown): AdditionalVoteType | undefined {
-  switch (value) {
-    case undefined: case "PURCHASE": case "SPONSOR": case "VIDEO": case "GAME": case "REFERAL": case "PROMO": return value;
-    default: throw new ApiValidationError("Invalid additionalVoteType.");
-  }
-}
-
 export class CreateVoterBody {
   declare private readonly validated: void;
   declare readonly email?: string;
@@ -37,31 +28,6 @@ export class CreateVoterBody {
       email: decodeOptionalString(source.email, "email"),
       phone: optionalPhone(source.phone),
       uniqRef: decodeOptionalString(source.uniqRef, "uniqRef"),
-    });
-  }
-}
-
-export class AddVoteBody {
-  declare private readonly validated: void;
-  declare readonly additionalVoteType?: AdditionalVoteType;
-  declare readonly nbPoints?: number;
-
-  constructor(fields: { additionalVoteType?: AdditionalVoteType; nbPoints?: number } = {}) {
-    if (fields === null || typeof fields !== "object" || Array.isArray(fields)) {
-      throw new ApiValidationError("Body fields must be an object.");
-    }
-    decodeVoteType(fields.additionalVoteType);
-    if (fields.nbPoints !== undefined) positiveInteger(fields.nbPoints, "nbPoints");
-    if (fields.additionalVoteType !== undefined) this.additionalVoteType = fields.additionalVoteType;
-    if (fields.nbPoints !== undefined) this.nbPoints = fields.nbPoints;
-    Object.freeze(this);
-  }
-
-  static decode(value: unknown): AddVoteBody {
-    const source = bodyObject(value);
-    return new AddVoteBody({
-      additionalVoteType: decodeVoteType(source.additionalVoteType),
-      nbPoints: source.nbPoints === undefined ? undefined : number(source.nbPoints, "nbPoints"),
     });
   }
 }
@@ -169,22 +135,6 @@ export class CreateVoterRequest {
   constructor(readonly showVoteUuid: string, readonly body: CreateVoterBody) {
     pathParameter(showVoteUuid, "showVoteUuid");
     if (!(body instanceof CreateVoterBody)) throw new ApiValidationError("body must be a CreateVoterBody.");
-    Object.freeze(this);
-  }
-}
-
-export interface AddVoteInput extends GetVoterInput {
-  additionalVoteType?: AdditionalVoteType;
-  nbPoints?: number;
-}
-
-export class AddVoteRequest {
-  declare private readonly validated: void;
-
-  constructor(readonly showVoteUuid: string, readonly userRef: string, readonly body: AddVoteBody) {
-    pathParameter(showVoteUuid, "showVoteUuid");
-    pathParameter(userRef, "userRef");
-    if (!(body instanceof AddVoteBody)) throw new ApiValidationError("body must be a AddVoteBody.");
     Object.freeze(this);
   }
 }

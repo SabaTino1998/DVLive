@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { setTimeout as delay } from "node:timers/promises";
-import { ApiResponse, ShowVote, ShowVoteChoice, Voter, CreateVoterResult, AddVoteResult, CastVoteResult, ApiService, ApiValidationError, ApiHttpError, ApiRequestError, ApiResponseError } from "../dist/index.js";
+import { ApiResponse, ShowVote, ShowVoteChoice, Voter, CreateVoterResult, CastVoteResult, ApiService, ApiValidationError, ApiHttpError, ApiRequestError, ApiResponseError } from "../dist/index.js";
 
 const config = { environment: "STAG", headers: { Authorization: "Bearer test-token" } };
 import { show, choice, voter, operation, cases, requestBodies } from "./responses.fixture.mjs";
@@ -26,7 +26,7 @@ for (const [method, args, path, payload] of cases) {
     assert.deepEqual(JSON.parse(JSON.stringify(result.data)), payload);
     assert.ok(result instanceof ApiResponse);
     const Model = { getShowVote: ShowVote, getShowVoteChoice: ShowVoteChoice, getVoter: Voter,
-      createVoter: CreateVoterResult, addVote: AddVoteResult, castVote: CastVoteResult }[method];
+      createVoter: CreateVoterResult, castVote: CastVoteResult }[method];
     assert.ok(result.data instanceof Model);
     assert.deepEqual(Object.keys(result).sort(), ["data", "headers", "status"]);
     assert.equal(result.status, status);
@@ -173,7 +173,7 @@ test("each endpoint maps only public response fields", async (t) => {
     assert.deepEqual(JSON.parse(JSON.stringify(result.data)), payload);
     assert.ok(result instanceof ApiResponse);
     const Model = { getShowVote: ShowVote, getShowVoteChoice: ShowVoteChoice, getVoter: Voter,
-      createVoter: CreateVoterResult, addVote: AddVoteResult, castVote: CastVoteResult }[method];
+      createVoter: CreateVoterResult, castVote: CastVoteResult }[method];
     assert.ok(result.data instanceof Model);
     assert.deepEqual(Object.keys(result).sort(), ["data", "headers", "status"]);
     assert.equal(Object.hasOwn(result.data, "upstreamOnly"), false);
@@ -181,7 +181,7 @@ test("each endpoint maps only public response fields", async (t) => {
 });
 
 test("nested mappings preserve nulls and absent optional fields and omit upstream extras", async (t) => {
-  const nestedChoice = { uuid: "choice", firstname: "First", lastname: "Last", bio: null };
+  const nestedChoice = { uuid: "choice", firstname: "First", lastname: "Last", status: "PRESENT", bio: null };
   const round = { currentRound: 1, startDay: "2026-01-01", endDay: "2026-01-02", name: "Round", choices: [nestedChoice] };
   t.mock.method(globalThis, "fetch", async () => Response.json({
     ...show, round: { ...round, upstreamOnly: true, choices: [{ ...nestedChoice, upstreamOnly: true }] },

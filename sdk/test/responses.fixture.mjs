@@ -1,8 +1,8 @@
 import { GetShowVoteRequest } from "../dist/requests/show-vote.js";
 import { GetShowVoteChoiceRequest } from "../dist/requests/show-vote-choice.js";
 import {
-  GetVoterRequest, CreateVoterRequest, AddVoteRequest, CastVoteRequest,
-  CreateVoterBody, AddVoteBody, CastVoteBody,
+  GetVoterRequest, CreateVoterRequest, CastVoteRequest,
+  CreateVoterBody, CastVoteBody,
 } from "../dist/requests/voter.js";
 
 export function makeRequest(method, fields) {
@@ -11,7 +11,6 @@ export function makeRequest(method, fields) {
     case "getShowVoteChoice": return new GetShowVoteChoiceRequest(fields.uuid);
     case "getVoter": return new GetVoterRequest(fields.showVoteUuid, fields.userRef);
     case "createVoter": return new CreateVoterRequest(fields.showVoteUuid, CreateVoterBody.decode(fields.body));
-    case "addVote": return new AddVoteRequest(fields.showVoteUuid, fields.userRef, AddVoteBody.decode(fields.body));
     case "castVote": return new CastVoteRequest(fields.showVoteUuid, fields.userRef, CastVoteBody.decode(fields.body));
     default: throw new Error("Unknown method");
   }
@@ -26,7 +25,6 @@ const rawCases = [
   ["getShowVoteChoice", [{ uuid: "choice" }], "/show-vote-choice/choice", choice],
   ["getVoter", [{ showVoteUuid: "show", userRef: "a/b ?#" }], "/show-vote/show/voter/a%2Fb%20%3F%23", voter],
   ["createVoter", [{ showVoteUuid: "show", body: { uniqRef: "a/b", phone: null } }], "/show-vote/show/voter", operation],
-  ["addVote", [{ showVoteUuid: "show", userRef: "a/b", body: { nbPoints: 3, additionalVoteType: "VIDEO" } }], "/show-vote/show/voter/a%2Fb/add-vote", { ...operation, nbVoteRemaining: 3 }],
   ["castVote", [{ showVoteUuid: "show", userRef: "a/b", body: { votes: [{ choiceUuid: "choice", nbVotes: 1 }], sessionToken: "session" } }], "/show-vote/show/voter/a%2Fb/vote", { ...operation, nbVoteRemaining: 2 }],
 ];
 

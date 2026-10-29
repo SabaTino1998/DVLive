@@ -1,0 +1,7 @@
+{
+  "name": "dvlive-test-support",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=18" },
+  "dependencies": { "@digitalvirgo/su-bolt-react": "2.6.0" }
+}

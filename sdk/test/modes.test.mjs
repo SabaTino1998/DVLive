@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { ApiModes, API_MODES, parseMode, getModeCatalog } from "@digitalvirgo/dvlive-api";
 
 test("every supported query value parses into its SDK enum member", () => {
-  assert.deepEqual(Object.values(ApiModes).sort(), ["addVote", "castVote", "createVoter", "getShowVote", "getShowVoteChoice", "getVoter"]);
+  assert.deepEqual(Object.values(ApiModes).sort(), ["castVote", "createVoter", "getShowVote", "getShowVoteChoice", "getVoter"]);
   for (const mode of Object.values(ApiModes)) {
     assert.deepEqual(parseMode(mode), { mode, catalog: null });
   }
@@ -11,7 +11,7 @@ test("every supported query value parses into its SDK enum member", () => {
 
 test("missing, empty and invalid modes return the complete catalog", () => {
   const catalog = getModeCatalog();
-  for (const value of [null, undefined, "", " ", "unknown", "GETSHOWVOTE", "getShowVote ", "constructor", "__proto__", "toString"]) {
+  for (const value of [null, undefined, "", " ", "unknown", "addVote", "GETSHOWVOTE", "getShowVote ", "constructor", "__proto__", "toString"]) {
     assert.deepEqual(parseMode(value), { mode: null, catalog });
   }
 });
@@ -22,7 +22,6 @@ test("catalog includes each mode's description, HTTP method and required paramet
     [ApiModes.GetShowVoteChoice]: ["GET", ["uuid"]],
     [ApiModes.GetVoter]: ["GET", ["showVoteUuid", "userRef"]],
     [ApiModes.CreateVoter]: ["POST", ["showVoteUuid"]],
-    [ApiModes.AddVote]: ["POST", ["showVoteUuid", "userRef"]],
     [ApiModes.CastVote]: ["POST", ["showVoteUuid", "userRef"]],
   };
   const catalog = getModeCatalog();
@@ -36,7 +35,7 @@ test("catalog includes each mode's description, HTTP method and required paramet
     assert.match(definition.description, /^(Returns|Registers|Credits|Casts) /);
     assert.equal(definition.response, {
       getShowVote: "ShowVote", getShowVoteChoice: "ShowVoteChoice", getVoter: "Voter",
-      createVoter: "CreateVoterResult", addVote: "AddVoteResult", castVote: "CastVoteResult",
+      createVoter: "CreateVoterResult", castVote: "CastVoteResult",
     }[mode]);
     assert.ok(Array.isArray(definition.body));
   }

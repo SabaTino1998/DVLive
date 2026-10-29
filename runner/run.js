@@ -56,14 +56,6 @@ const ACTION_REGISTRY = {
     optional: [],
     summary: 'Get voter balance and fraud status',
   },
-  addVote: {
-    group: 'voter',
-    http: 'POST /show-vote/{uuid}/voter/{uniqRef}/add-vote',
-    client: 'client.voters.addVote(showVoteUuid, uniqRef, body)',
-    config: ['addVote.showVoteUuid', 'addVote.userRef'],
-    optional: ['addVote.additionalVoteType', 'addVote.nbPoints'],
-    summary: 'Credit additional votes (VIDEO, PURCHASE, …)',
-  },
   castVote: {
     group: 'voter',
     http: 'POST /show-vote/{uuid}/voter/{uniqRef}/vote',
@@ -317,17 +309,6 @@ async function runGetVoter(client, cfg) {
   return res;
 }
 
-async function runAddVote(client, cfg) {
-  require_(cfg.addVote, ['showVoteUuid', 'userRef'], 'addVote');
-  const { showVoteUuid, userRef } = cfg.addVote;
-  const body = voterRequestBody(cfg.addVote);
-  printHeader('voters.addVote', { showVoteUuid, uniqRef: userRef, body });
-  const res = await client.voters.addVote(showVoteUuid, userRef, body);
-  console.log(JSON.stringify(res, null, 2));
-  printNbVoteRemaining(res);
-  return res;
-}
-
 async function runCastVote(client, cfg) {
   require_(cfg.castVote, ['showVoteUuid', 'userRef', 'votes'], 'castVote');
   const { showVoteUuid, userRef } = cfg.castVote;
@@ -430,9 +411,6 @@ async function main() {
       break;
     case 'getVoter':
       await runGetVoter(client, cfg);
-      break;
-    case 'addVote':
-      await runAddVote(client, cfg);
       break;
     case 'castVote':
       await runCastVote(client, cfg);

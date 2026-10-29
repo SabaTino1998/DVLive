@@ -24,13 +24,6 @@
     "userRef": "ozzy-001"
   },
 
-  "addVote": {
-    "showVoteUuid": "00000000-0000-4000-8000-000000000001",
-    "userRef": "ozzy-001",
-    "additionalVoteType": "VIDEO",
-    "nbPoints": 3
-  },
-
   "castVote": {
     "showVoteUuid": "00000000-0000-4000-8000-000000000001",
     "userRef": "ozzy-001",

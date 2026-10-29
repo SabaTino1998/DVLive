@@ -24,3 +24,9 @@ test("package root exposes services and models while keeping request and body cl
   assert.equal(typeof SDK.parseMode, "function");
   assert.equal(typeof SDK.ApiModes, "object");
 });
+
+test("vote credit operation is not exposed by the SDK", () => {
+  assert.equal(Object.hasOwn(ApiService.prototype, "addVote"), false);
+  assert.equal(Object.hasOwn(SDK, "AddVoteResult"), false);
+  assert.equal(Object.hasOwn(SDK.ApiModes, "AddVote"), false);
+});

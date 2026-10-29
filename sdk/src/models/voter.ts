@@ -1,4 +1,4 @@
-import type { AddVoteResponse, CastVoteResponse, CreateVoterResponse, GetVoterResponse, VoterBalanceResponse } from "../responses/voter.ts";
+import type { CastVoteResponse, CreateVoterResponse, GetVoterResponse, VoterBalanceResponse } from "../responses/voter.ts";
 
 export type UserFraudStatus = "CLEAN" | "SUSPICIOUS" | "BLOCKED" | "VERIFIED";
 
@@ -10,7 +10,7 @@ export class OperationResult {
     readonly message: string,
   ) {}
 
-  static fromResponse(response: CreateVoterResponse | AddVoteResponse | CastVoteResponse): OperationResult {
+  static fromResponse(response: CreateVoterResponse | CastVoteResponse): OperationResult {
     return new OperationResult(
       response.status,
       response.code,
@@ -31,24 +31,6 @@ export class CreateVoterResult {
       response.status,
       response.code,
       response.message,
-    );
-  }
-}
-
-export class AddVoteResult {
-  constructor(
-    readonly status: "success",
-    readonly code: number,
-    readonly message: string,
-    readonly nbVoteRemaining: number,
-  ) {}
-
-  static fromResponse(response: AddVoteResponse): AddVoteResult {
-    return new AddVoteResult(
-      response.status,
-      response.code,
-      response.message,
-      response.nbVoteRemaining,
     );
   }
 }

@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { ApiService, ApiResponseError } from "@digitalvirgo/dvlive-api";
 import { ShowVoteResponse } from "../dist/responses/show-vote.js";
-import { ShowVoteChoiceResponse } from "../dist/responses/show-vote-choice.js";
-import { GetVoterResponse, CreateVoterResponse, AddVoteResponse, CastVoteResponse } from "../dist/responses/voter.js";
+import { ChoiceResponse, ShowVoteChoiceResponse } from "../dist/responses/show-vote-choice.js";
+import { GetVoterResponse, CreateVoterResponse, CastVoteResponse } from "../dist/responses/voter.js";
 import { cases, show, choice, voter } from "./responses.fixture.mjs";
 
 const specification = JSON.parse(await readFile(new URL("../../runner/openapi.json", import.meta.url), "utf8"));
@@ -13,7 +13,6 @@ const endpoints = [
   ["getShowVoteChoice", ShowVoteChoiceResponse, "ShowVoteChoiceResponse"],
   ["getVoter", GetVoterResponse, "GetVoterResponse"],
   ["createVoter", CreateVoterResponse, "OperationResult"],
-  ["addVote", AddVoteResponse, "OperationResult"],
   ["castVote", CastVoteResponse, "OperationResult"],
 ];
 
@@ -21,7 +20,7 @@ for (const [method, ResponseType, schemaName] of endpoints) {
   const decode = ResponseType.decode;
   const [, args, , payload] = cases.find(([name]) => name === method);
   const schema = specification.components.schemas[schemaName];
-  const fields = [...schema.required, ...(["addVote", "castVote"].includes(method) ? ["nbVoteRemaining"] : [])];
+  const fields = [...schema.required, ...(["castVote"].includes(method) ? ["nbVoteRemaining"] : [])];
 
   test(`${method}: decoder enforces every required field from the OpenAPI contract`, () => {
     const decoded = decode({ ...payload, upstreamOnly: true });
@@ -64,7 +63,7 @@ for (const [method, ResponseType, schemaName] of endpoints) {
 }
 
 test("decoders validate nested objects, optional fields, arrays and enum values", () => {
-  const round = { currentRound: 1, startDay: "start", endDay: "end", name: "Round", choices: [{ uuid: "choice", firstname: "First", lastname: "Last" }] };
+  const round = { currentRound: 1, startDay: "start", endDay: "end", name: "Round", choices: [{ uuid: "choice", firstname: "First", lastname: "Last", status: "PRESENT" }] };
   for (const invalidRound of [false, [], {}, { ...round, choices: null }, { ...round, choices: [null] },
     { ...round, choices: [{ uuid: "choice", firstname: "First" }] }, { ...round, currentRound: "1" }]) {
     assert.throws(() => ShowVoteResponse.decode({ ...show, round: invalidRound }), TypeError);
@@ -95,7 +94,7 @@ test("decoders validate nested objects, optional fields, arrays and enum values"
   for (const value of ["CLEAN", "SUSPICIOUS", "BLOCKED", "VERIFIED"]) {
     assert.equal(GetVoterResponse.decode({ ...voter, userFraudStatus: value }).userFraudStatus, value);
   }
-  for (const ResponseType of [CreateVoterResponse, AddVoteResponse, CastVoteResponse]) {
+  for (const ResponseType of [CreateVoterResponse, CastVoteResponse]) {
     const decode = ResponseType.decode;
     for (const status of ["error", "SUCCESS", null]) {
       assert.throws(() => decode({ status, code: 201, message: "Recorded", nbVoteRemaining: 0 }), TypeError);
@@ -107,4 +106,24 @@ test("nested decoding errors identify the full field path", () => {
   assert.throws(() => ShowVoteResponse.decode({ ...show, round: {
     currentRound: 1, startDay: "start", endDay: "end", name: "Round", choices: [{ uuid: 123 }],
   } }), { message: "ShowVoteResponse.round.choices[0].uuid must be a string." });
+});
+
+test("round choice status accepts only EVICTED and PRESENT and reaches public DTOs", async (t) => {
+  const participant = { uuid: "choice", firstname: "First", lastname: "Last" };
+  for (const status of ["EVICTED", "PRESENT"]) {
+    assert.equal(ChoiceResponse.decode({ ...participant, status }).status, status);
+    const payload = { ...show, round: {
+      currentRound: 1, startDay: "start", endDay: "end", name: "Round",
+      choices: [{ ...participant, status }],
+    } };
+    t.mock.method(globalThis, "fetch", async () => new Response(JSON.stringify(payload)));
+    const response = await new ApiService({ environment: "STAG" }).getShowVote("show");
+    assert.equal(response.data.round.choices[0].status, status);
+  }
+  for (const status of [undefined, null, "ACTIVE", "present", "", 1]) {
+    assert.throws(() => ShowVoteResponse.decode({ ...show, round: {
+      currentRound: 1, startDay: "start", endDay: "end", name: "Round",
+      choices: [{ ...participant, status }],
+    } }), { message: "ShowVoteResponse.round.choices[0].status must be EVICTED or PRESENT." });
+  }
 });

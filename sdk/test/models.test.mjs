@@ -2,13 +2,13 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   ApiResponse, ShowVote, Round, Choice, ShowVoteChoice, EliminatedRound, ReintroducedRound,
-  Voter, VoterBalance, CreateVoterResult, AddVoteResult, CastVoteResult,
+  Voter, VoterBalance, CreateVoterResult, CastVoteResult,
 } from "@digitalvirgo/dvlive-api";
 import { cases, show, choice, voter } from "./responses.fixture.mjs";
 
 for (const [method, Model] of [
   ["getShowVote", ShowVote], ["getShowVoteChoice", ShowVoteChoice], ["getVoter", Voter],
-  ["createVoter", CreateVoterResult], ["addVote", AddVoteResult], ["castVote", CastVoteResult],
+  ["createVoter", CreateVoterResult], ["castVote", CastVoteResult],
 ]) {
   test(`${method}: model factory selects fields without modifying the response`, () => {
     const payload = cases.find(([name]) => name === method)[3];
@@ -24,7 +24,7 @@ for (const [method, Model] of [
 test("nested DTOs are independent of service response objects", () => {
   const response = { ...show, round: {
     currentRound: 1, startDay: "start", endDay: "end", name: "Round", upstreamOnly: true,
-    choices: [{ uuid: "choice", firstname: "First", lastname: "Last", upstreamOnly: true }],
+    choices: [{ uuid: "choice", firstname: "First", lastname: "Last", status: "PRESENT", upstreamOnly: true }],
   } };
   const dto = ShowVote.fromResponse(response);
   assert.ok(dto.round instanceof Round);
@@ -52,7 +52,7 @@ test("constructors preserve absent and null fields and expose only serializable 
   assert.equal(Object.hasOwn(show, "round"), false);
   assert.deepEqual(JSON.parse(JSON.stringify(show)), { name: "Show", startDate: "start", endDate: "end" });
   assert.equal(new ShowVote("Show", "start", "end", null).round, null);
-  const participant = new Choice("choice", "First", "Last", null);
+  const participant = new Choice("choice", "First", "Last", "PRESENT", null);
   assert.equal(participant.bio, null);
   assert.equal(Object.hasOwn(participant, "desktopPicture"), false);
   assert.deepEqual(JSON.parse(JSON.stringify(new VoterBalance(0, 2))), { standardPoint: 0, additionalPoint: 2 });

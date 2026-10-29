@@ -1,16 +1,16 @@
 import { ShowVoteResponse } from "./responses/show-vote.ts";
 import { ShowVoteChoiceResponse } from "./responses/show-vote-choice.ts";
-import { GetVoterResponse, CreateVoterResponse, AddVoteResponse, CastVoteResponse } from "./responses/voter.ts";
+import { GetVoterResponse, CreateVoterResponse, CastVoteResponse } from "./responses/voter.ts";
 import { ApiHttpError, ApiRequestError, ApiResponseError } from "./ApiErrors.ts";
 import { resolveBaseUrl } from "./environment.ts";
 import { ApiResponse } from "./models/api-response.ts";
 import { ShowVote } from "./models/show-vote.ts";
 import { ShowVoteChoice } from "./models/show-vote-choice.ts";
-import { AddVoteResult, CastVoteResult, CreateVoterResult, Voter } from "./models/voter.ts";
-import { GetVoterRequest, AddVoteRequest, CastVoteRequest, CreateVoterRequest, CreateVoterBody, AddVoteBody, CastVoteBody } from "./requests/voter.ts";
+import { CastVoteResult, CreateVoterResult, Voter } from "./models/voter.ts";
+import { GetVoterRequest, CastVoteRequest, CreateVoterRequest, CreateVoterBody, CastVoteBody } from "./requests/voter.ts";
 import { GetShowVoteRequest } from "./requests/show-vote.ts";
 import { GetShowVoteChoiceRequest } from "./requests/show-vote-choice.ts";
-import type { GetVoterInput, CreateVoterInput, AddVoteInput, CastVoteInput } from "./requests/voter.ts";
+import type { GetVoterInput, CreateVoterInput, CastVoteInput } from "./requests/voter.ts";
 
 interface HttpResponse extends ApiResponse<unknown> {
   bodyText: string;
@@ -76,18 +76,6 @@ export class ApiService {
     try {
       const decoded = GetVoterResponse.decode(response.data);
       return new ApiResponse(Voter.fromResponse(decoded), response.status, response.headers);
-    } catch (cause) {
-      throw new ApiResponseError(response, response.bodyText, cause);
-    }
-  }
-
-  async addVote(...args: [input: AddVoteInput] | [input: Pick<AddVoteInput, "showVoteUuid" | "userRef">, body: unknown]): Promise<ApiResponse<AddVoteResult>> {
-    const [input, ...body] = args;
-    const request = new AddVoteRequest(input?.showVoteUuid, input?.userRef, AddVoteBody.decode(body.length === 0 ? input : body[0]));
-    const response = await this.request("POST", `${this.voterPath(request.showVoteUuid)}/${encodeURIComponent(request.userRef)}/add-vote`, request.body);
-    try {
-      const decoded = AddVoteResponse.decode(response.data);
-      return new ApiResponse(AddVoteResult.fromResponse(decoded), response.status, response.headers);
     } catch (cause) {
       throw new ApiResponseError(response, response.bodyText, cause);
     }

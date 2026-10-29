@@ -64,7 +64,6 @@ function callApi(api: ApiService, mode: ApiModes, query: URLSearchParams, body?:
     case ApiModes.GetShowVoteChoice: return api.getShowVoteChoice(uuid);
     case ApiModes.GetVoter: return api.getVoter({ showVoteUuid, userRef });
     case ApiModes.CreateVoter: return api.createVoter({ showVoteUuid }, body);
-    case ApiModes.AddVote: return api.addVote({ showVoteUuid, userRef }, body);
     case ApiModes.CastVote: return api.castVote({ showVoteUuid, userRef }, body);
     default: {
       const unsupported: ApiModes = mode;

@@ -945,7 +945,8 @@
                 "required": [
                     "uuid",
                     "firstname",
-                    "lastname"
+                    "lastname",
+                    "status"
                 ],
                 "properties": {
                     "uuid": {
@@ -956,6 +957,10 @@
                     },
                     "lastname": {
                         "type": "string"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": ["EVICTED", "PRESENT"]
                     },
                     "bio": {
                         "type": "string",

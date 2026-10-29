@@ -3,7 +3,7 @@
 - `sdk/`: TypeScript package `@digitalvirgo/dvlive-api`, with typed responses and HTTP metadata.
 - `runner/`: original Node.js runner, client, configuration, and OpenAPI specification.
 - `supabase/`: single **DVLive** Edge Function and backend configuration.
-- `script/`: individual smoke tests for local/remote Supabase.
+- `script/`: individual smoke tests; `add-vote` calls DV Live directly, other voting operations use Supabase.
 
 ## Runner
 
@@ -39,7 +39,6 @@ Mapped SDK response data and the original DV Live HTTP status codes are returned
 | `getShowVote` | GET | `uuid` | — | Show, dates, and current round with participants |
 | `getVoter` | GET | `showVoteUuid`, `userRef` | — | Voter, balance, fraud status |
 | `createVoter` | POST | `showVoteUuid` | Optional `email`, `phone`, `uniqRef` | Registration result |
-| `addVote` | POST | `showVoteUuid`, `userRef` | `additionalVoteType`, `nbPoints` | Vote credit result and remaining votes, when provided |
 | `castVote` | POST | `showVoteUuid`, `userRef` | Required `votes`, optional fraud prevention fields | Voting result and remaining votes, when provided |
 
 `votes` is a non-empty array of `{ "choiceUuid": "...", "nbVotes": 1 }`.
@@ -150,3 +149,7 @@ SDK tests use mocked HTTP responses and run separately from the live smoke tests
 npm ci --prefix sdk
 npm --prefix sdk test
 ```
+
+Vote crediting is available only through `bash script/smoke-add-vote.sh`, which uses
+local DV Live environment/bearer configuration and calls the upstream API directly with curl.
+It is not exposed by the SDK, Edge Function, or reference runner.

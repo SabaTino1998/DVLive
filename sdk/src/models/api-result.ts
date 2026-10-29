@@ -1,6 +1,6 @@
 import type { ShowVote } from "./show-vote.ts";
 import type { ShowVoteChoice } from "./show-vote-choice.ts";
-import type { Voter, CreateVoterResult, AddVoteResult, CastVoteResult } from "./voter.ts";
+import type { Voter, CreateVoterResult, CastVoteResult } from "./voter.ts";
 
 /** Public data returned by any supported SDK operation. */
 export type ApiResult =
@@ -8,5 +8,4 @@ export type ApiResult =
   | ShowVoteChoice
   | Voter
   | CreateVoterResult
-  | AddVoteResult
   | CastVoteResult;

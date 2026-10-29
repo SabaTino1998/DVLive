@@ -1,5 +1,14 @@
 import { integer, nullable, object, string } from "./decoding.ts";
 
+export type ChoiceStatusResponse = "EVICTED" | "PRESENT";
+
+function decodeChoiceStatus(value: unknown, path: string): ChoiceStatusResponse {
+  switch (value) {
+    case "EVICTED": case "PRESENT": return value;
+    default: throw new TypeError(`${path} must be EVICTED or PRESENT.`);
+  }
+}
+
 /** Decoded DV Live wire models. Each class owns its validation. */
 export class EliminatedRoundResponse {
   constructor(
@@ -42,6 +51,7 @@ export class ChoiceResponse {
     readonly uuid: string,
     readonly firstname: string,
     readonly lastname: string,
+    readonly status: ChoiceStatusResponse,
   ) {}
 
   static decode(value: unknown, path = "ChoiceResponse"): ChoiceResponse {
@@ -50,6 +60,7 @@ export class ChoiceResponse {
       string(source.uuid, `${path}.uuid`),
       string(source.firstname, `${path}.firstname`),
       string(source.lastname, `${path}.lastname`),
+      decodeChoiceStatus(source.status, `${path}.status`),
     );
     if (source.bio !== undefined) response.bio = nullable(source.bio, string, `${path}.bio`);
     if (source.desktopPicture !== undefined) response.desktopPicture = nullable(source.desktopPicture, string, `${path}.desktopPicture`);

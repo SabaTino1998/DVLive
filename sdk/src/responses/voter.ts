@@ -73,26 +73,6 @@ export class CreateVoterResponse {
   }
 }
 
-export class AddVoteResponse {
-  constructor(
-    readonly status: "success",
-    readonly code: number,
-    readonly message: string,
-    readonly nbVoteRemaining: number,
-  ) {}
-
-  static decode(value: unknown, path = "AddVoteResponse"): AddVoteResponse {
-    const source = object(value, path);
-    const response = new AddVoteResponse(
-      decodeSuccess(source.status, `${path}.status`),
-      integer(source.code, `${path}.code`),
-      string(source.message, `${path}.message`),
-      integer(source.nbVoteRemaining, `${path}.nbVoteRemaining`),
-    );
-    return response;
-  }
-}
-
 export class CastVoteResponse {
   constructor(
     readonly status: "success",

@@ -1,4 +1,6 @@
-import type { ChoiceResponse, EliminatedRoundResponse, ReintroducedRoundResponse, ShowVoteChoiceResponse } from "../responses/show-vote-choice.ts";
+import type { ChoiceStatusResponse, ChoiceResponse, EliminatedRoundResponse, ReintroducedRoundResponse, ShowVoteChoiceResponse } from "../responses/show-vote-choice.ts";
+
+export type ChoiceStatus = ChoiceStatusResponse;
 
 /** Public DTOs. Customize field names and transformations in fromResponse(). */
 export class EliminatedRound {
@@ -38,6 +40,7 @@ export class Choice {
     readonly uuid: string,
     readonly firstname: string,
     readonly lastname: string,
+    readonly status: ChoiceStatus,
     bio?: string | null,
     desktopPicture?: string | null,
     mobilePicture?: string | null,
@@ -52,6 +55,7 @@ export class Choice {
       response.uuid,
       response.firstname,
       response.lastname,
+      response.status,
       response.bio,
       response.desktopPicture,
       response.mobilePicture,

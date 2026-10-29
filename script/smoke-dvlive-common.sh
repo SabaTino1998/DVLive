@@ -44,6 +44,17 @@ FN="${SUPABASE_URL%/}/functions/v1/dvlive"
 TMP=$(mktemp)
 trap 'rm -f "$TMP"' EXIT
 
+# Hide SmartUser session tokens in console output; raw OUT_FILE stays opt-in.
+dvlive_print_response() {
+  if [[ "${USER_REF:-}" == N_* ]]; then
+    local response
+    response=$(cat "$TMP")
+    printf '%s\n' "${response//"$USER_REF"/[REDACTED]}"
+  else
+    cat "$TMP"
+  fi
+}
+
 # dvlive_request MODE METHOD QUERY_JSON [BODY_JSON] [EXPECTED_STATUS] [REQUIRE_TOKEN]
 dvlive_request() {
   local mode=$1 method=$2 params=$3 body=${4-} expected=${5:-200} require_token=${6:-true}
@@ -67,10 +78,16 @@ dvlive_request() {
   done < <(jq -r 'keys[]' <<<"$params")
   [[ -z "$body" ]] || options+=(--header 'Content-Type: application/json' --data-raw "$body")
   HTTP=$(curl "${options[@]}" "$url") || { echo 'FAIL: request failed' >&2; exit 1; }
-  echo "URL: $url"
+  local display_url=$url
+  if [[ "${USER_REF:-}" == N_* ]]; then
+    local encoded_ref
+    encoded_ref=$(jq -rn --arg value "$USER_REF" '$value | @uri')
+    display_url=${display_url//"$encoded_ref"/[REDACTED]}
+  fi
+  echo "URL: $display_url"
   echo "HTTP: $HTTP"
   if [[ "$HTTP" != "$expected" ]]; then
-    cat "$TMP" >&2
+    dvlive_print_response >&2
     echo "FAIL: expected HTTP $expected" >&2
     exit 1
   fi
@@ -79,7 +96,7 @@ dvlive_request() {
 
 dvlive_assert() {
   if ! jq -e "$1" "$TMP" >/dev/null; then
-    cat "$TMP" >&2
+    dvlive_print_response >&2
     echo "FAIL: $2" >&2
     exit 1
   fi
@@ -90,7 +107,7 @@ dvlive_output() {
     jq . "$TMP" > "$OUT_FILE"
     echo "Wrote: $OUT_FILE"
   else
-    jq . "$TMP"
+    dvlive_print_response | jq .
   fi
   echo "PASS: $1 response is valid"
 }

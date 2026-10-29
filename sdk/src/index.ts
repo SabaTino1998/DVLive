@@ -4,8 +4,8 @@ export { ApiHttpError, ApiRequestError, ApiResponseError, ApiValidationError } f
 export { ApiResponse } from "./models/api-response.ts";
 export type { ApiResult } from "./models/api-result.ts";
 export { ShowVote, Round } from "./models/show-vote.ts";
-export { Choice, ShowVoteChoice, EliminatedRound, ReintroducedRound } from "./models/show-vote-choice.ts";
-export { type UserFraudStatus, OperationResult, CreateVoterResult, AddVoteResult, CastVoteResult, VoterBalance, Voter } from "./models/voter.ts";
-export type { AdditionalVoteType, GetVoterInput, CreateVoterInput, AddVoteInput, CastVoteInput, CastVoteChoiceInput } from "./requests/voter.ts";
+export { type ChoiceStatus, Choice, ShowVoteChoice, EliminatedRound, ReintroducedRound } from "./models/show-vote-choice.ts";
+export { type UserFraudStatus, OperationResult, CreateVoterResult, CastVoteResult, VoterBalance, Voter } from "./models/voter.ts";
+export type { GetVoterInput, CreateVoterInput, CastVoteInput, CastVoteChoiceInput } from "./requests/voter.ts";
 export { ApiModes, API_MODES, parseMode, getModeCatalog } from "./ApiModes.ts";
 export type { ApiModeDefinition, ModeCatalog, ModeParseResult } from "./ApiModes.ts";

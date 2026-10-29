@@ -4,7 +4,6 @@ export enum ApiModes {
   GetShowVote = "getShowVote",
   CreateVoter = "createVoter",
   GetVoter = "getVoter",
-  AddVote = "addVote",
   CastVote = "castVote",
 }
 
@@ -39,11 +38,6 @@ export const API_MODES: Readonly<Record<ApiModes, ApiModeDefinition>> = {
     method: "GET", params: ["showVoteUuid", "userRef"], body: [],
     description: "Returns the voter reference and contact details, remaining points, fraud status, and balance breakdown.",
     response: "Voter",
-  },
-  [ApiModes.AddVote]: {
-    method: "POST", params: ["showVoteUuid", "userRef"], body: ["additionalVoteType", "nbPoints"],
-    description: "Credits additional votes and returns the operation result, including nbVoteRemaining when provided by the API.",
-    response: "AddVoteResult",
   },
   [ApiModes.CastVote]: {
     method: "POST", params: ["showVoteUuid", "userRef"],

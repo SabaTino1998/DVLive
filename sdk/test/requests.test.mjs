@@ -47,7 +47,7 @@ for (const [method, [validInput], , payload] of requestCases) {
   });
 }
 
-for (const method of ["createVoter", "addVote", "castVote"]) {
+for (const method of ["createVoter", "castVote"]) {
   test(`${method}: raw HTTP input cannot override route identifiers or forward extra fields`, async (t) => {
     const [, [input], expectedPath, payload] = requestCases.find(([name]) => name === method);
     const api = new ApiService({ environment: "STAG" });

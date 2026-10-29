@@ -98,7 +98,6 @@ api.getShowVote(uuid);
 api.getShowVoteChoice(uuid);
 api.getVoter({ showVoteUuid, userRef });
 api.createVoter({ showVoteUuid }, body);
-api.addVote({ showVoteUuid, userRef }, body);
 api.castVote({ showVoteUuid, userRef }, body);
 ```
 
@@ -123,7 +122,7 @@ are copied as needed and are not mutated.
 ## Results, models, and errors
 
 Keep `callApi` typed as `Promise<ApiResponse<ApiResult>>`. `ApiResult` is the SDK
-union of the six possible operation models. Individual SDK methods keep their
+union of the five possible operation models. Individual SDK methods keep their
 specific model types; do not introduce an unconstrained caller-selected generic.
 
 The SDK follows `Response.decode()` -> `Model.fromResponse()` -> `ApiResponse`.

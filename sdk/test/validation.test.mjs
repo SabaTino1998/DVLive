@@ -2,15 +2,13 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ApiService, ApiValidationError } from "@digitalvirgo/dvlive-api";
 
-import { CreateVoterBody, AddVoteBody, CastVoteBody, CastVoteChoiceRequest } from "../dist/requests/voter.js";
+import { CreateVoterBody, CastVoteBody, CastVoteChoiceRequest } from "../dist/requests/voter.js";
 
 
 const config = { environment: "STAG" };
 const vote = { choiceUuid: "choice", nbVotes: 1 };
 const invalidBodies = {
   createVoter: [undefined, null, [], "body", { email: 1 }, { uniqRef: false }, { phone: 123 }, { email: null }],
-  addVote: [undefined, null, [], "body", { additionalVoteType: "INVALID" }, { additionalVoteType: ["VIDEO"] }, { additionalVoteType: null },
-    ...[0, -1, 0.5, NaN, Infinity, "1"].map((nbPoints) => ({ nbPoints }))],
   castVote: [undefined, null, [], "body", {}, { unknown: true }, { votes: null }, { votes: {} }, { votes: [] }, { votes: [null] }, { votes: [{}] },
     { votes: [{ ...vote, choiceUuid: " " }] }, { votes: [{ ...vote, choiceUuid: 1 }] },
     ...[0, -1, 0.5, NaN, Infinity, "1"].map((nbVotes) => ({ votes: [{ ...vote, nbVotes }] })),
@@ -42,8 +40,6 @@ test("valid optional fields and enum values pass validation without mutating req
     ["createVoter", {}],
     ["createVoter", { email: "email@example.com", phone: null, uniqRef: "voter" }],
     ["createVoter", { phone: "+33601020304" }],
-    ["addVote", {}],
-    ...["PURCHASE", "SPONSOR", "VIDEO", "GAME", "REFERAL", "PROMO"].map((additionalVoteType) => ["addVote", { additionalVoteType, nbPoints: 1 }]),
     ["castVote", { votes: [vote] }],
     ["castVote", { votes: [vote], sessionToken: "session", phoneFingerPrint: "fingerprint", ip: "203.0.113.10", userAgent: "agent", uniqSubscriptionId: "subscription" }],
   ];
@@ -60,8 +56,6 @@ test("valid optional fields and enum values pass validation without mutating req
 
 test("body constructors validate typed fields and protect validated state", () => {
   assert.throws(() => new CreateVoterBody({ email: 1 }), ApiValidationError);
-  assert.throws(() => new AddVoteBody({ nbPoints: 0 }), ApiValidationError);
-  assert.throws(() => new AddVoteBody({ additionalVoteType: "INVALID" }), ApiValidationError);
   assert.throws(() => new CastVoteChoiceRequest(" ", 1), ApiValidationError);
   assert.throws(() => new CastVoteChoiceRequest("choice", -1), ApiValidationError);
   assert.throws(() => new CastVoteBody({ votes: [] }), ApiValidationError);
@@ -76,6 +70,5 @@ test("body constructors validate typed fields and protect validated state", () =
 
 test("body decoding selects known fields and ignores extra JSON at every level", () => {
   assert.deepEqual(JSON.parse(JSON.stringify(CreateVoterBody.decode({ uniqRef: "voter", extra: true }))), { uniqRef: "voter" });
-  assert.deepEqual(JSON.parse(JSON.stringify(AddVoteBody.decode({ nbPoints: 2, extra: true }))), { nbPoints: 2 });
   assert.deepEqual(JSON.parse(JSON.stringify(CastVoteBody.decode({ votes: [{ choiceUuid: "choice", nbVotes: 1, extra: true }], extra: true }))), { votes: [{ choiceUuid: "choice", nbVotes: 1 }] });
 });

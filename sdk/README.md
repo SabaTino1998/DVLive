@@ -1,6 +1,6 @@
 # @digitalvirgo/dvlive-api
 
-TypeScript SDK for the six DV Live voting endpoints. Uses standard `fetch` and
+TypeScript SDK for the five DV Live voting endpoints. Uses standard `fetch` and
 returns mapped data together with the original HTTP status and response headers.
 No runtime dependencies, Deno globals, server configuration, or injected HTTP client.
 Node.js >=18 or a compatible fetch runtime (including Supabase/Deno) is required.
@@ -62,10 +62,9 @@ class ApiResponse<T> {
 | `getShowVoteChoice(uuid)` | UUID string | `ShowVoteChoice` |
 | `getVoter(input)` | `GetVoterInput` | `Voter` |
 | `createVoter(input)` | `CreateVoterInput` | `CreateVoterResult` |
-| `addVote(input)` | `AddVoteInput` | `AddVoteResult` |
 | `castVote(input)` | `CastVoteInput` | `CastVoteResult` |
 
-`ApiResult` is the exported union of all six operation result models. Dispatchers
+`ApiResult` is the exported union of all five operation result models. Dispatchers
 that support multiple modes can return `ApiResponse<ApiResult>`; individual SDK
 methods retain their specific model return types.
 
@@ -80,12 +79,6 @@ await api.getShowVote(showUuid);
 await api.getShowVoteChoice(choiceUuid);
 await api.getVoter({ showVoteUuid: showUuid, userRef });
 await api.createVoter({ showVoteUuid: showUuid, uniqRef: userRef });
-await api.addVote({
-  showVoteUuid: showUuid,
-  userRef,
-  additionalVoteType: "VIDEO",
-  nbPoints: 1,
-});
 await api.castVote({
   showVoteUuid: showUuid,
   userRef,
@@ -93,7 +86,7 @@ await api.castVote({
 });
 ```
 
-`GetVoterInput`, `CreateVoterInput`, `AddVoteInput`, `CastVoteInput`, and
+`GetVoterInput`, `CreateVoterInput`, `CastVoteInput`, and
 `CastVoteChoiceInput` are optional type-only imports for consumer annotations.
 Their definitions live beside the corresponding request classes in
 `src/requests/voter.ts`; ordinary calls infer the types.
@@ -108,7 +101,6 @@ const body: unknown = await request.json();
 const result = await api.castVote({ showVoteUuid, userRef }, body);
 // Also supported:
 await api.createVoter({ showVoteUuid }, body);
-await api.addVote({ showVoteUuid, userRef }, body);
 ```
 
 The one-argument form takes the flat typed input; the two-argument form
@@ -128,7 +120,7 @@ classes, decoders, wire responses, and helpers remain internal. No separate Edge
 entrypoint is needed; HTTP adapters use the same public service methods.
 
 The public DTOs are `ShowVote`, `ShowVoteChoice`, `Voter`, `CreateVoterResult`,
-`AddVoteResult`, and `CastVoteResult`. Previous public `*Response` names have been
+and `CastVoteResult`. Previous public `*Response` names have been
 removed rather than retained as aliases. The mode catalog now reports DTO names.
 Field names in the returned JSON are unchanged; additional upstream fields are omitted.
 
@@ -202,7 +194,7 @@ POST, but the SDK also preserves other successful statuses returned by the serve
 
 The SDK exports `ApiModes` (a string enum), `parseMode`, `getModeCatalog`, and
 `API_MODES`. Query values remain `getShowVote`, `getShowVoteChoice`, `getVoter`,
-`createVoter`, `addVote`, and `castVote`. Enum members use PascalCase, for example
+`createVoter` and `castVote`. Enum members use PascalCase, for example
 `ApiModes.GetShowVote` and `ApiModes.CastVote`.
 
 ```ts
@@ -254,7 +246,6 @@ try {
     console.log(error.status, error.statusText);
     console.log(error.document); // Parsed JSON, when available; can be null.
     console.log(error.bodyText); // Original response text, including non-JSON.
-    console.log(error.headers.get("retry-after"));
   } else if (error instanceof ApiRequestError) {
     console.log(error.kind); // "network" or "timeout"
   } else if (error instanceof ApiResponseError) {
@@ -328,3 +319,6 @@ The package exports only its root API. Published artifacts include `dist/` and
 this README; source tests and Supabase credentials are excluded. A `prepack`
 script builds the package before packaging. The npm scope must be configured
 for the target registry before a separate publication step.
+
+Vote crediting (`add-vote`) is intentionally excluded from the SDK and Edge Function.
+Use the standalone direct-curl smoke test `../script/smoke-add-vote.sh`.
