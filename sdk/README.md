@@ -8,7 +8,7 @@ Node.js >=18 or a compatible fetch runtime (including Supabase/Deno) is required
 ## Usage
 
 ```ts
-import { ApiService, GetShowVoteRequest, type ApiResponse, type ShowVote } from "@digitalvirgo/dvlive-api";
+import { ApiService, type ApiResponse, type ShowVote } from "@digitalvirgo/dvlive-api";
 
 const api = new ApiService({
   environment: "STAG",
@@ -16,7 +16,7 @@ const api = new ApiService({
   timeoutMs: 15_000,
 });
 
-const result: ApiResponse<ShowVote> = await api.getShowVote(new GetShowVoteRequest(showUuid));
+const result: ApiResponse<ShowVote> = await api.getShowVote(showUuid);
 console.log(result.data.name);
 console.log(result.status);
 console.log(result.headers.get("x-request-id"));
@@ -56,68 +56,83 @@ class ApiResponse<T> {
 }
 ```
 
-| Method | Request type | Response data |
+| Method | Public input | Response data |
 | --- | --- | --- |
-| `getShowVote(request)` | `GetShowVoteRequest` | `ShowVote` |
-| `getShowVoteChoice(request)` | `GetShowVoteChoiceRequest` | `ShowVoteChoice` |
-| `getVoter(request)` | `GetVoterRequest` | `Voter` |
-| `createVoter(request)` | `CreateVoterRequest` | `CreateVoterResult` |
-| `addVote(request)` | `AddVoteRequest` | `AddVoteResult` |
-| `castVote(request)` | `CastVoteRequest` | `CastVoteResult` |
+| `getShowVote(uuid)` | UUID string | `ShowVote` |
+| `getShowVoteChoice(uuid)` | UUID string | `ShowVoteChoice` |
+| `getVoter(input)` | `GetVoterInput` | `Voter` |
+| `createVoter(input)` | `CreateVoterInput` | `CreateVoterResult` |
+| `addVote(input)` | `AddVoteInput` | `AddVoteResult` |
+| `castVote(input)` | `CastVoteInput` | `CastVoteResult` |
 
 `ApiResult` is the exported union of all six operation result models. Dispatchers
 that support multiple modes can return `ApiResponse<ApiResult>`; individual SDK
 methods retain their specific model return types.
 
-Every method takes a validated request class instance. Constructors check typed
-field constraints. GET request constructors take their path parameters; POST
-request constructors additionally take a `CreateVoterBody`, `AddVoteBody`, or
-`CastVoteBody` instance.
+### Plain typed inputs
+
+Call methods with strings or plain objects. No request or body classes need to be
+imported. The SDK constructs and validates its internal requests before accessing
+credentials or making an HTTP call:
 
 ```ts
-import {
-  GetShowVoteRequest, GetShowVoteChoiceRequest, GetVoterRequest,
-  CreateVoterRequest, AddVoteRequest, CastVoteRequest,
-  CreateVoterBody, AddVoteBody, CastVoteBody,
-} from "@digitalvirgo/dvlive-api";
-
-await api.getShowVote(new GetShowVoteRequest(showUuid));
-await api.getShowVoteChoice(new GetShowVoteChoiceRequest(choiceUuid));
-await api.getVoter(new GetVoterRequest(showUuid, userRef));
-await api.createVoter(new CreateVoterRequest(showUuid, new CreateVoterBody({ uniqRef: userRef })));
-await api.addVote(new AddVoteRequest(showUuid, userRef,
-  new AddVoteBody({ additionalVoteType: "VIDEO", nbPoints: 1 })));
-await api.castVote(new CastVoteRequest(showUuid, userRef,
-  CastVoteBody.decode({ votes: [{ choiceUuid, nbVotes: 1 }] })));
+await api.getShowVote(showUuid);
+await api.getShowVoteChoice(choiceUuid);
+await api.getVoter({ showVoteUuid: showUuid, userRef });
+await api.createVoter({ showVoteUuid: showUuid, uniqRef: userRef });
+await api.addVote({
+  showVoteUuid: showUuid,
+  userRef,
+  additionalVoteType: "VIDEO",
+  nbPoints: 1,
+});
+await api.castVote({
+  showVoteUuid: showUuid,
+  userRef,
+  votes: [{ choiceUuid, nbVotes: 1 }],
+});
 ```
 
-At the external JSON boundary, use a body's static `decode(value: unknown)`
-method. It reads known fields explicitly and constructs validated instances:
+`GetVoterInput`, `CreateVoterInput`, `AddVoteInput`, `CastVoteInput`, and
+`CastVoteChoiceInput` are optional type-only imports for consumer annotations.
+Their definitions live beside the corresponding request classes in
+`src/requests/voter.ts`; ordinary calls infer the types.
+
+### Raw JSON from HTTP adapters
+
+POST methods also accept a separate raw body as a second argument, keeping
+untrusted JSON validation inside the SDK without exposing decoders:
 
 ```ts
-const body = CastVoteBody.decode(await request.json());
-const result = await api.castVote(new CastVoteRequest(showUuid, userRef, body));
+const body: unknown = await request.json();
+const result = await api.castVote({ showVoteUuid, userRef }, body);
+// Also supported:
+await api.createVoter({ showVoteUuid }, body);
+await api.addVote({ showVoteUuid, userRef }, body);
 ```
 
-Unknown JSON properties are ignored and are never forwarded upstream, including
-extra fields inside individual votes. There is no generic key registry or
-`Object.keys().filter()` validation. Raw `unknown` input is confined to decoding.
-Only `request.body` is serialized into upstream POST JSON; path parameters remain
-in the URL. Request and body instances are frozen, including vote entries and the
-copied votes array, to preserve validated values. Services require the correct
-request class and reject plain objects before accessing credentials or HTTP.
+The one-argument form takes the flat typed input; the two-argument form
+takes route parameters and raw JSON. Supplying `undefined` as the second argument
+is an invalid body, not a request to fall back to the first argument.
 
-Public DTO classes, request classes, nested models, and enum unions are exported
-from the package root. Request models live in `src/requests/`; DTOs live in
-`src/models/`. Wire response classes in `src/responses/` are
-internal to the service and are not exported from the package root.
+The SDK selects known body fields explicitly and ignores extra properties,
+including extra fields in individual votes. Route values come from the first
+argument and cannot be overridden by JSON body fields. Only selected body fields
+are serialized to upstream POST JSON; route parameters stay in the URL.
+Caller inputs are not mutated. Internal validated requests and bodies are frozen,
+with copied vote arrays, to preserve the values used by the HTTP call.
+
+The package root exports the service, configuration and input types, public model
+classes, field types, errors, and mode/catalog utilities. Request classes, body
+classes, decoders, wire responses, and helpers remain internal. No separate Edge
+entrypoint is needed; HTTP adapters use the same public service methods.
 
 The public DTOs are `ShowVote`, `ShowVoteChoice`, `Voter`, `CreateVoterResult`,
 `AddVoteResult`, and `CastVoteResult`. Previous public `*Response` names have been
 removed rather than retained as aliases. The mode catalog now reports DTO names.
 Field names in the returned JSON are unchanged; additional upstream fields are omitted.
 
-`body.votes`, `choiceUuid`, and `nbVotes` are required in vote requests.
+`votes`, `choiceUuid`, and `nbVotes` are required in vote requests.
 `REFERAL` retains the upstream spelling. Successful vote and credit DTOs
 include `nbVoteRemaining`.
 
@@ -172,15 +187,11 @@ The Edge Function serializes `result.data`, so changes to model fields and
 `fromResponse()` also change its public JSON response. Properties are instance
 data; static methods and class prototypes are not included in the serialized JSON.
 
-Body constructors check string fields and nullable phone values, validate
-acquisition types, and require positive integer points and vote counts. Vote
-bodies require at least one valid vote. `CastVoteBody.decode()` constructs
-`CastVoteChoiceRequest` instances internally. The class is also exported from the
-package root for callers that construct vote bodies directly in TypeScript.
-Path parameter constructors reject blank values and dot segments.
-Invalid constructor arguments or JSON decoding throw `ApiValidationError`
-synchronously, before credentials or HTTP calls. Service methods return promises
-and reject invalid request instance types with the same error.
+Internal request and body constructors validate path values, optional strings,
+nullable phone values, acquisition types, and positive integer counts. Votes
+require a non-empty array with valid choice identifiers and counts. Input
+validation failures reject the service promise with `ApiValidationError` before
+credentials or HTTP calls. Missing, blank, and dot-segment path values are rejected.
 Optional fields remain optional; constraints such as lengths and phone formatting
 remain with the upstream API.
 
@@ -195,7 +206,7 @@ The SDK exports `ApiModes` (a string enum), `parseMode`, `getModeCatalog`, and
 `ApiModes.GetShowVote` and `ApiModes.CastVote`.
 
 ```ts
-import { ApiModes, parseMode, GetShowVoteRequest } from "@digitalvirgo/dvlive-api";
+import { ApiModes, parseMode } from "@digitalvirgo/dvlive-api";
 
 const parsed = parseMode(url.searchParams.get("mode"));
 if (parsed.mode === null) {
@@ -204,7 +215,7 @@ if (parsed.mode === null) {
 
 switch (parsed.mode) { // ApiModes, not an arbitrary string.
   case ApiModes.GetShowVote: {
-    const result = await api.getShowVote(new GetShowVoteRequest(uuid));
+    const result = await api.getShowVote(uuid);
     return json(result.data, result.status);
   }
   // Handle the remaining enum members.
@@ -232,10 +243,10 @@ HTTP method, required parameters and authentication.
 ## Errors
 
 ```ts
-import { ApiHttpError, ApiRequestError, ApiResponseError, ApiValidationError, GetVoterRequest } from "@digitalvirgo/dvlive-api";
+import { ApiHttpError, ApiRequestError, ApiResponseError, ApiValidationError } from "@digitalvirgo/dvlive-api";
 
 try {
-  await api.getVoter(new GetVoterRequest(showUuid, userRef));
+  await api.getVoter({ showVoteUuid: showUuid, userRef });
 } catch (error) {
   if (error instanceof ApiValidationError) {
     console.log(error.message); // Invalid request parameter or body; no HTTP request was sent.
@@ -276,7 +287,7 @@ while the mode catalog remains available. The SDK does not read `.env` or cache
 authentication.
 
 The Edge Function handles HTTP method, query and header extraction, content type
-and JSON parsing, then decodes the body using the SDK and constructs its request class. Its HTTP query parameters
+and JSON parsing, then passes path values and raw JSON to the SDK service. Its HTTP query parameters
 and POST body format remain unchanged. Request parameter and body validation is owned by the SDK; the Edge Function
 converts `ApiValidationError` to HTTP 400.
 
@@ -297,7 +308,6 @@ From the repository root (Node.js >=22.18 for development tests):
 npm ci --prefix sdk
 npm --prefix sdk run check
 npm --prefix sdk test
-./script/test.sh
 ```
 
 `check` checks source types, the public method contracts and the Edge Function.
@@ -305,8 +315,9 @@ npm --prefix sdk test
 are not packaged. `test` builds the package, tests request and response validation,
 model constructors and factories, nested model independence, and mocked HTTP calls, then checks the public
 declarations as a consumer would use them.
-`script/test.sh` runs these checks plus Edge Function tests and each Bash smoke
-test with simulated upstream responses; no live votes or credits are created.
+SDK tests use mocked HTTP responses and do not create real votes or credits.
+Verify the Edge Function separately by running the relevant smoke script for each
+operation against an active local or remote function; see `script/README.md`.
 
 ```sh
 npm --prefix sdk run build

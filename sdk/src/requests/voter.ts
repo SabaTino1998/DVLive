@@ -1,7 +1,6 @@
 import { ApiValidationError } from "../ApiErrors.ts";
 import { bodyObject, string, optionalString as decodeOptionalString, optionalPhone, number } from "./body-decoding.ts";
 import { pathParameter, optionalString, positiveInteger } from "./validation.ts";
-
 export type AdditionalVoteType = "PURCHASE" | "SPONSOR" | "VIDEO" | "GAME" | "REFERAL" | "PROMO";
 
 function decodeVoteType(value: unknown): AdditionalVoteType | undefined {
@@ -65,6 +64,11 @@ export class AddVoteBody {
       nbPoints: source.nbPoints === undefined ? undefined : number(source.nbPoints, "nbPoints"),
     });
   }
+}
+
+export interface CastVoteChoiceInput {
+  choiceUuid: string;
+  nbVotes: number;
 }
 
 export class CastVoteChoiceRequest {
@@ -137,6 +141,11 @@ export class CastVoteBody {
   }
 }
 
+export interface GetVoterInput {
+  showVoteUuid: string;
+  userRef: string;
+}
+
 export class GetVoterRequest {
   declare private readonly validated: void;
 
@@ -145,6 +154,13 @@ export class GetVoterRequest {
     pathParameter(userRef, "userRef");
     Object.freeze(this);
   }
+}
+
+export interface CreateVoterInput {
+  showVoteUuid: string;
+  email?: string;
+  phone?: string | null;
+  uniqRef?: string;
 }
 
 export class CreateVoterRequest {
@@ -157,6 +173,11 @@ export class CreateVoterRequest {
   }
 }
 
+export interface AddVoteInput extends GetVoterInput {
+  additionalVoteType?: AdditionalVoteType;
+  nbPoints?: number;
+}
+
 export class AddVoteRequest {
   declare private readonly validated: void;
 
@@ -166,6 +187,15 @@ export class AddVoteRequest {
     if (!(body instanceof AddVoteBody)) throw new ApiValidationError("body must be a AddVoteBody.");
     Object.freeze(this);
   }
+}
+
+export interface CastVoteInput extends GetVoterInput {
+  votes: readonly CastVoteChoiceInput[];
+  sessionToken?: string;
+  phoneFingerPrint?: string;
+  ip?: string;
+  userAgent?: string;
+  uniqSubscriptionId?: string;
 }
 
 export class CastVoteRequest {

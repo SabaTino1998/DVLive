@@ -1,18 +1,16 @@
 import { ShowVoteResponse } from "./responses/show-vote.ts";
 import { ShowVoteChoiceResponse } from "./responses/show-vote-choice.ts";
 import { GetVoterResponse, CreateVoterResponse, AddVoteResponse, CastVoteResponse } from "./responses/voter.ts";
-import { ApiHttpError, ApiRequestError, ApiResponseError, ApiValidationError } from "./ApiErrors.ts";
+import { ApiHttpError, ApiRequestError, ApiResponseError } from "./ApiErrors.ts";
 import { resolveBaseUrl } from "./environment.ts";
 import { ApiResponse } from "./models/api-response.ts";
 import { ShowVote } from "./models/show-vote.ts";
 import { ShowVoteChoice } from "./models/show-vote-choice.ts";
-import {
-  AddVoteResult, CastVoteResult, CreateVoterResult, Voter,
-} from "./models/voter.ts";
-import { GetVoterRequest, AddVoteRequest, CastVoteRequest, CreateVoterRequest } from "./requests/voter.ts";
-
+import { AddVoteResult, CastVoteResult, CreateVoterResult, Voter } from "./models/voter.ts";
+import { GetVoterRequest, AddVoteRequest, CastVoteRequest, CreateVoterRequest, CreateVoterBody, AddVoteBody, CastVoteBody } from "./requests/voter.ts";
 import { GetShowVoteRequest } from "./requests/show-vote.ts";
 import { GetShowVoteChoiceRequest } from "./requests/show-vote-choice.ts";
+import type { GetVoterInput, CreateVoterInput, AddVoteInput, CastVoteInput } from "./requests/voter.ts";
 
 interface HttpResponse extends ApiResponse<unknown> {
   bodyText: string;
@@ -38,8 +36,8 @@ export class ApiService {
     }
   }
 
-  async getShowVote(request: GetShowVoteRequest): Promise<ApiResponse<ShowVote>> {
-    if (!(request instanceof GetShowVoteRequest)) throw new ApiValidationError("request must be a GetShowVoteRequest.");
+  async getShowVote(uuid: string): Promise<ApiResponse<ShowVote>> {
+    const request = new GetShowVoteRequest(uuid);
     const response = await this.request("GET", `/show-vote/${encodeURIComponent(request.uuid)}`);
     try {
       const decoded = ShowVoteResponse.decode(response.data);
@@ -49,8 +47,8 @@ export class ApiService {
     }
   }
 
-  async getShowVoteChoice(request: GetShowVoteChoiceRequest): Promise<ApiResponse<ShowVoteChoice>> {
-    if (!(request instanceof GetShowVoteChoiceRequest)) throw new ApiValidationError("request must be a GetShowVoteChoiceRequest.");
+  async getShowVoteChoice(uuid: string): Promise<ApiResponse<ShowVoteChoice>> {
+    const request = new GetShowVoteChoiceRequest(uuid);
     const response = await this.request("GET", `/show-vote-choice/${encodeURIComponent(request.uuid)}`);
     try {
       const decoded = ShowVoteChoiceResponse.decode(response.data);
@@ -60,8 +58,9 @@ export class ApiService {
     }
   }
 
-  async createVoter(request: CreateVoterRequest): Promise<ApiResponse<CreateVoterResult>> {
-    if (!(request instanceof CreateVoterRequest)) throw new ApiValidationError("request must be a CreateVoterRequest.");
+  async createVoter(...args: [input: CreateVoterInput] | [input: Pick<CreateVoterInput, "showVoteUuid">, body: unknown]): Promise<ApiResponse<CreateVoterResult>> {
+    const [input, ...body] = args;
+    const request = new CreateVoterRequest(input?.showVoteUuid, CreateVoterBody.decode(body.length === 0 ? input : body[0]));
     const response = await this.request("POST", this.voterPath(request.showVoteUuid), request.body);
     try {
       const decoded = CreateVoterResponse.decode(response.data);
@@ -71,8 +70,8 @@ export class ApiService {
     }
   }
 
-  async getVoter(request: GetVoterRequest): Promise<ApiResponse<Voter>> {
-    if (!(request instanceof GetVoterRequest)) throw new ApiValidationError("request must be a GetVoterRequest.");
+  async getVoter(input: GetVoterInput): Promise<ApiResponse<Voter>> {
+    const request = new GetVoterRequest(input?.showVoteUuid, input?.userRef);
     const response = await this.request("GET", `${this.voterPath(request.showVoteUuid)}/${encodeURIComponent(request.userRef)}`);
     try {
       const decoded = GetVoterResponse.decode(response.data);
@@ -82,8 +81,9 @@ export class ApiService {
     }
   }
 
-  async addVote(request: AddVoteRequest): Promise<ApiResponse<AddVoteResult>> {
-    if (!(request instanceof AddVoteRequest)) throw new ApiValidationError("request must be a AddVoteRequest.");
+  async addVote(...args: [input: AddVoteInput] | [input: Pick<AddVoteInput, "showVoteUuid" | "userRef">, body: unknown]): Promise<ApiResponse<AddVoteResult>> {
+    const [input, ...body] = args;
+    const request = new AddVoteRequest(input?.showVoteUuid, input?.userRef, AddVoteBody.decode(body.length === 0 ? input : body[0]));
     const response = await this.request("POST", `${this.voterPath(request.showVoteUuid)}/${encodeURIComponent(request.userRef)}/add-vote`, request.body);
     try {
       const decoded = AddVoteResponse.decode(response.data);
@@ -93,8 +93,9 @@ export class ApiService {
     }
   }
 
-  async castVote(request: CastVoteRequest): Promise<ApiResponse<CastVoteResult>> {
-    if (!(request instanceof CastVoteRequest)) throw new ApiValidationError("request must be a CastVoteRequest.");
+  async castVote(...args: [input: CastVoteInput] | [input: Pick<CastVoteInput, "showVoteUuid" | "userRef">, body: unknown]): Promise<ApiResponse<CastVoteResult>> {
+    const [input, ...body] = args;
+    const request = new CastVoteRequest(input?.showVoteUuid, input?.userRef, CastVoteBody.decode(body.length === 0 ? input : body[0]));
     const response = await this.request("POST", `${this.voterPath(request.showVoteUuid)}/${encodeURIComponent(request.userRef)}/vote`, request.body);
     try {
       const decoded = CastVoteResponse.decode(response.data);

@@ -1,7 +1,9 @@
+import { GetShowVoteRequest } from "../dist/requests/show-vote.js";
+import { GetShowVoteChoiceRequest } from "../dist/requests/show-vote-choice.js";
 import {
-  GetShowVoteRequest, GetShowVoteChoiceRequest, GetVoterRequest,
-  CreateVoterRequest, AddVoteRequest, CastVoteRequest, CreateVoterBody, AddVoteBody, CastVoteBody,
-} from "@digitalvirgo/dvlive-api";
+  GetVoterRequest, CreateVoterRequest, AddVoteRequest, CastVoteRequest,
+  CreateVoterBody, AddVoteBody, CastVoteBody,
+} from "../dist/requests/voter.js";
 
 export function makeRequest(method, fields) {
   switch (method) {
@@ -29,4 +31,11 @@ const rawCases = [
 ];
 
 
-export const cases = rawCases.map(([method, [request], path, payload]) => [method, [makeRequest(method, request)], path, payload]);
+export const requestCases = rawCases;
+export const requestBodies = Object.fromEntries(rawCases.map(([method, [input]]) => [method, input.body]));
+export const cases = rawCases.map(([method, [input], path, payload]) => {
+  const args = method === "getShowVote" || method === "getShowVoteChoice" ? [input.uuid]
+    : method === "getVoter" ? [{ showVoteUuid: input.showVoteUuid, userRef: input.userRef }]
+    : [{ ...input.body, showVoteUuid: input.showVoteUuid, ...(method === "createVoter" ? {} : { userRef: input.userRef }) }];
+  return [method, args, path, payload];
+});

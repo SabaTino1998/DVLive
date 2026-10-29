@@ -3,7 +3,7 @@
 - `sdk/`: TypeScript package `@digitalvirgo/dvlive-api`, with typed responses and HTTP metadata.
 - `runner/`: original Node.js runner, client, configuration, and OpenAPI specification.
 - `supabase/`: single **DVLive** Edge Function and backend configuration.
-- `script/`: smoke tests for local/remote Supabase and proxy tests.
+- `script/`: individual smoke tests for local/remote Supabase.
 
 ## Runner
 
@@ -99,13 +99,13 @@ The Edge Function uses `@digitalvirgo/dvlive-api` through the local mapping in
 the function locally or include it in a deployment.
 
 ```ts
-import { ApiService, GetShowVoteRequest } from "@digitalvirgo/dvlive-api";
+import { ApiService } from "@digitalvirgo/dvlive-api";
 
 const api = new ApiService({
   environment: "STAG", // The Edge Function reads this value from DVLIVE_ENV.
   headers: () => ({ Authorization: `Bearer ${token}` }),
 });
-const result = await api.getShowVote(new GetShowVoteRequest(uuid));
+const result = await api.getShowVote(uuid);
 // result.data: ShowVote; result.status: number; result.headers: Headers
 return json(result.data, result.status);
 ```
@@ -144,9 +144,9 @@ as in `atom`: from the environment, then `supabase status -o json`, then the loc
 The DV Live token is sent through `bearer-token` and does not belong in the server's `.env` file.
 
 Details, POST scripts, and available variables: [script/README.md](script/README.md).
-Local tests with a simulated upstream require Node.js >=22.18, Bash, curl, and jq:
+SDK tests use mocked HTTP responses and run separately from the live smoke tests:
 
 ```sh
 npm ci --prefix sdk
-./script/test.sh
+npm --prefix sdk test
 ```

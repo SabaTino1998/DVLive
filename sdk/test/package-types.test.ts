@@ -1,9 +1,8 @@
 // Resolve the built package's public declarations, without SDK source aliases.
-import { ApiService, ApiModes, parseMode, type ApiResult, ApiResponse, ShowVote, GetShowVoteRequest, CastVoteBody, CastVoteRequest } from "@digitalvirgo/dvlive-api";
+import { ApiService, ApiModes, parseMode, type ApiResult, ApiResponse, ShowVote, type CastVoteInput, type CastVoteChoiceInput } from "@digitalvirgo/dvlive-api";
 
 function consumePackage(api: ApiService): Promise<ApiResponse<ShowVote>> {
-  const request: GetShowVoteRequest = new GetShowVoteRequest("show");
-  return api.getShowVote(request);
+  return api.getShowVote("show");
 }
 void consumePackage;
 
@@ -40,10 +39,17 @@ void invalidOperationResult;
 // @ts-expect-error Environment values are internal to the SDK, not a public enum or union.
 import type { ApiEnvironment } from "@digitalvirgo/dvlive-api";
 
-const voteBody = CastVoteBody.decode({ votes: [{ choiceUuid: "choice", nbVotes: 1 }] });
-const voteRequest = new CastVoteRequest("show", "voter", voteBody);
-void voteRequest;
-import { CastVoteChoiceRequest } from "@digitalvirgo/dvlive-api";
+const vote: CastVoteChoiceInput = { choiceUuid: "choice", nbVotes: 1 };
+const voteInput: CastVoteInput = { showVoteUuid: "show", userRef: "voter", votes: [vote] };
+function consumeVotes(api: ApiService, body: unknown): Promise<ApiResponse<ApiResult>> {
+  void api.castVote(voteInput);
+  return api.castVote({ showVoteUuid: "show", userRef: "voter" }, body);
+}
+void consumeVotes;
 
-const typedVoteBody = new CastVoteBody({ votes: [new CastVoteChoiceRequest("choice", 1)] });
-void typedVoteBody;
+// @ts-expect-error Request classes are internal implementation details.
+import { GetShowVoteRequest } from "@digitalvirgo/dvlive-api";
+// @ts-expect-error Body decoders are internal implementation details.
+import { CastVoteBody } from "@digitalvirgo/dvlive-api";
+// @ts-expect-error Vote entry classes are internal; use plain CastVoteChoiceInput values.
+import { CastVoteChoiceRequest } from "@digitalvirgo/dvlive-api";

@@ -2,47 +2,40 @@ import {
   ApiService, type ApiResponse, type ShowVote, type ShowVoteChoice,
   ApiModes, parseMode, API_MODES, type ModeCatalog,
   type Voter, type CreateVoterResult, type AddVoteResult, type CastVoteResult,
-  GetShowVoteRequest, GetShowVoteChoiceRequest, GetVoterRequest,
-  CreateVoterRequest, AddVoteRequest, CastVoteRequest,
-  CreateVoterBody, AddVoteBody, CastVoteBody,
+  type GetVoterInput, type CreateVoterInput, type AddVoteInput, type CastVoteInput,
 } from "../src/index.ts";
 
 // Compile-time contract checks. This function is never invoked against a real API.
 async function publicContract(api: ApiService) {
-  const showRequest: GetShowVoteRequest = new GetShowVoteRequest("show");
-  const choiceRequest: GetShowVoteChoiceRequest = new GetShowVoteChoiceRequest("choice");
-  const voterRequest: GetVoterRequest = new GetVoterRequest("show", "voter");
-  const createBody: CreateVoterBody = new CreateVoterBody({ phone: null });
-  const addBody: AddVoteBody = new AddVoteBody({ additionalVoteType: "REFERAL", nbPoints: 1 });
-  const castBody: CastVoteBody = CastVoteBody.decode({ votes: [{ choiceUuid: "choice", nbVotes: 1 }] });
-  const createRequest: CreateVoterRequest = new CreateVoterRequest("show", createBody);
-  const addRequest: AddVoteRequest = new AddVoteRequest("show", "voter", addBody);
-  const castRequest: CastVoteRequest = new CastVoteRequest("show", "voter", castBody);
-  const show: ApiResponse<ShowVote> = await api.getShowVote(showRequest);
-  const choice: ApiResponse<ShowVoteChoice> = await api.getShowVoteChoice(choiceRequest);
-  const voter: ApiResponse<Voter> = await api.getVoter(voterRequest);
-  const created: ApiResponse<CreateVoterResult> = await api.createVoter(createRequest);
-  const credited: ApiResponse<AddVoteResult> = await api.addVote(addRequest);
-  const voted: ApiResponse<CastVoteResult> = await api.castVote(castRequest);
+  const voterInput: GetVoterInput = { showVoteUuid: "show", userRef: "voter" };
+  const createInput: CreateVoterInput = { showVoteUuid: "show", phone: null };
+  const addInput: AddVoteInput = { ...voterInput, additionalVoteType: "REFERAL", nbPoints: 1 };
+  const castInput: CastVoteInput = { ...voterInput, votes: [{ choiceUuid: "choice", nbVotes: 1 }] };
+  const show: ApiResponse<ShowVote> = await api.getShowVote("show");
+  const choice: ApiResponse<ShowVoteChoice> = await api.getShowVoteChoice("choice");
+  const voter: ApiResponse<Voter> = await api.getVoter(voterInput);
+  const created: ApiResponse<CreateVoterResult> = await api.createVoter(createInput);
+  const credited: ApiResponse<AddVoteResult> = await api.addVote(addInput);
+  const voted: ApiResponse<CastVoteResult> = await api.castVote(castInput);
+  const json: unknown = { votes: [{ choiceUuid: "choice", nbVotes: 1 }] };
+  await api.castVote(voterInput, json);
+  await api.addVote(voterInput, json);
+  await api.createVoter({ showVoteUuid: "show" }, json);
   const remaining: number = voted.data.nbVoteRemaining;
   const headers: Headers = show.headers;
   const status: number = show.status;
   // @ts-expect-error The response model does not contain this field.
   show.data.nbVoteRemaining;
   // @ts-expect-error Additional vote types follow the upstream enum.
-  new AddVoteBody({ additionalVoteType: "INVALID" });
-  // @ts-expect-error Casting a vote requires typed vote instances.
-  new CastVoteBody({ votes: [{ choiceUuid: "choice", nbVotes: 1 }] });
-  // @ts-expect-error GET methods require a request object, not positional values.
-  api.getShowVote("show");
-  // @ts-expect-error Voter requests require both path parameters.
-  api.getVoter({ showVoteUuid: "show" });
-  // @ts-expect-error POST requests require an explicit body property.
-  api.createVoter({ showVoteUuid: "show" });
-  // @ts-expect-error Body fields belong inside body, not at the request root.
-  api.addVote({ showVoteUuid: "show", userRef: "voter", nbPoints: 1 });
-  // @ts-expect-error Plain objects must be constructed into validated request classes.
+  api.addVote({ ...voterInput, additionalVoteType: "INVALID" });
+  // @ts-expect-error Casting a vote requires votes in the typed input.
+  api.castVote(voterInput);
+  // @ts-expect-error Vote counts must be numbers.
+  api.castVote({ ...voterInput, votes: [{ choiceUuid: "choice", nbVotes: "1" }] });
+  // @ts-expect-error Show queries take the original UUID string.
   api.getShowVote({ uuid: "show" });
+  // @ts-expect-error Voter inputs require both path parameters.
+  api.getVoter({ showVoteUuid: "show" });
   return { show, choice, voter, created, credited, voted, remaining, headers, status };
 }
 void publicContract;

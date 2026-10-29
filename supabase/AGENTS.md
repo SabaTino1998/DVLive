@@ -87,35 +87,38 @@ Read URL values into explicit variables such as `uuid`, `showVoteUuid`, and
 `userRef`. Keep path parameters in the query of the public Edge endpoint; do not
 merge them into the upstream JSON body or create a generic parameter map.
 
-## Constructing SDK requests
+## Calling the SDK
 
-Services accept validated request class instances, not plain object literals.
-Use constructors for path parameters and a body's public static `decode()` for
-untrusted JSON:
+Use the public service methods with simple parameters. Request and body classes,
+wire responses, and decoders are internal SDK details and are not root exports.
+The SDK constructs and validates its requests internally.
 
 ```ts
-api.getShowVote(new GetShowVoteRequest(uuid));
-api.getShowVoteChoice(new GetShowVoteChoiceRequest(uuid));
-api.getVoter(new GetVoterRequest(showVoteUuid, userRef));
-api.createVoter(new CreateVoterRequest(showVoteUuid, CreateVoterBody.decode(body)));
-api.addVote(new AddVoteRequest(showVoteUuid, userRef, AddVoteBody.decode(body)));
-api.castVote(new CastVoteRequest(showVoteUuid, userRef, CastVoteBody.decode(body)));
+api.getShowVote(uuid);
+api.getShowVoteChoice(uuid);
+api.getVoter({ showVoteUuid, userRef });
+api.createVoter({ showVoteUuid }, body);
+api.addVote({ showVoteUuid, userRef }, body);
+api.castVote({ showVoteUuid, userRef }, body);
 ```
 
-Keep incoming JSON typed as `unknown` until the appropriate SDK decoder accepts
-it. Do not cast it to a body type or duplicate its validation in the function.
-Constructors and decoders throw `ApiValidationError` synchronously; keep request
-construction inside the handler's error boundary.
+For HTTP POST input, keep parsed JSON typed as `unknown` and pass it as the
+second argument. These overloads validate raw data inside the SDK; do not cast
+it to a typed input, spread it into route values, or duplicate body validation
+in the function. Keep the service call inside the handler's error boundary and
+await it; invalid input rejects with `ApiValidationError`.
 
-Body decoders select known fields explicitly and ignore extra JSON properties,
-including extra fields in individual votes. Do not reintroduce generic
-`Object.keys().filter()` rejection of unknown body fields. Internal decoding
-helpers belong to the SDK and must not be imported by the function.
+Other TypeScript consumers can pass one flat typed input instead, for example
+`api.castVote({ showVoteUuid, userRef, votes: [{ choiceUuid, nbVotes: 1 }] })`.
+Input interfaces and field types are public type-only exports. Models, errors,
+mode parsing, and catalog utilities remain in the same package entrypoint;
+do not add a separate `/edge` entrypoint.
 
-Request and body instances are frozen. Construct a new instance to change their
-values. `CastVoteBody.decode()` creates its vote entries internally; the Edge
-Function does not need to import `CastVoteChoiceRequest`. That class remains a
-public SDK export for other consumers that construct vote bodies directly.
+The SDK selects known body fields explicitly and ignores extra JSON properties,
+including extra fields in individual votes. Route values passed separately
+cannot be overridden by body properties. Do not reintroduce generic key-registry
+validation in the function. SDK requests are frozen internally; caller inputs
+are copied as needed and are not mutated.
 
 ## Results, models, and errors
 
@@ -165,26 +168,21 @@ supabase start
 supabase functions serve dvlive --env-file supabase/.env
 ```
 
-Keep `createHandler({ env })` injectable so tests can provide environment values.
-For integration or SDK behavior changes, run:
+Verify integration behavior by running the relevant smoke script separately
+for each operation against an active local or remote function. Configure the
+shared URL and credentials and each script's identifiers as described in
+[the smoke test guide](../script/README.md). There is no combined integration
+runner. POST smoke scripts create or modify real data; use test resources.
 
-```sh
-./script/test.sh
-```
-
-The repository harness currently includes SDK development checks and simulated
-upstream tests for the function and smoke scripts. When migrating the runtime
-mapping to npm, adapt any harness resolution that assumes a local SDK checkout
-to exercise the same pinned package used by the function. SDK development checks
-can remain a separate workflow; do not restore a fixed source path to make npm
-integration tests pass. Verify function types, public package imports, registry
-resolution, and local bundling after dependency configuration changes.
+SDK type checks and unit tests remain a separate workflow in its own repository,
+using mocked HTTP responses. Verify function types, public package imports,
+registry resolution, and local bundling after dependency configuration changes.
+Do not introduce a fixed SDK source path for npm integration checks.
 
 When extending an operation, implement SDK changes in its own repository:
 request/body, response decoder, model factory, mode metadata, `ApiResult` union,
 and public exports as applicable. Publish the required SDK version, update the
 function's pinned dependency, and update function dispatch and affected tests. Cover invalid input before
 upstream calls, extra fields, response decoding failures, error/status
-preservation, and concurrent request token isolation where relevant. Keep local
-verification deterministic: simulated upstream tests must not create real votes
-or credits.
+preservation, and concurrent request token isolation where relevant. Keep SDK
+unit tests deterministic with mocked HTTP; run live smoke checks per operation.

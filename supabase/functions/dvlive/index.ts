@@ -1,7 +1,6 @@
 import {
   ApiService, ApiHttpError, ApiRequestError, ApiResponseError, ApiValidationError, ApiModes, API_MODES, parseMode,
-  type ApiModeDefinition, type ApiResponse, type ApiResult, CreateVoterBody, AddVoteBody, CastVoteBody,
-  GetShowVoteRequest, GetShowVoteChoiceRequest, GetVoterRequest, CreateVoterRequest, AddVoteRequest, CastVoteRequest,
+  type ApiModeDefinition, type ApiResponse, type ApiResult,
 } from "@digitalvirgo/dvlive-api";
 
 interface HandlerOptions {
@@ -61,12 +60,12 @@ function callApi(api: ApiService, mode: ApiModes, query: URLSearchParams, body?:
 
   // SDK methods validate parameters and the JSON body before making an HTTP request.
   switch (mode) {
-    case ApiModes.GetShowVote: return api.getShowVote(new GetShowVoteRequest(uuid));
-    case ApiModes.GetShowVoteChoice: return api.getShowVoteChoice(new GetShowVoteChoiceRequest(uuid));
-    case ApiModes.GetVoter: return api.getVoter(new GetVoterRequest(showVoteUuid, userRef));
-    case ApiModes.CreateVoter: return api.createVoter(new CreateVoterRequest(showVoteUuid, CreateVoterBody.decode(body)));
-    case ApiModes.AddVote: return api.addVote(new AddVoteRequest(showVoteUuid, userRef, AddVoteBody.decode(body)));
-    case ApiModes.CastVote: return api.castVote(new CastVoteRequest(showVoteUuid, userRef, CastVoteBody.decode(body)));
+    case ApiModes.GetShowVote: return api.getShowVote(uuid);
+    case ApiModes.GetShowVoteChoice: return api.getShowVoteChoice(uuid);
+    case ApiModes.GetVoter: return api.getVoter({ showVoteUuid, userRef });
+    case ApiModes.CreateVoter: return api.createVoter({ showVoteUuid }, body);
+    case ApiModes.AddVote: return api.addVote({ showVoteUuid, userRef }, body);
+    case ApiModes.CastVote: return api.castVote({ showVoteUuid, userRef }, body);
     default: {
       const unsupported: ApiModes = mode;
       throw new InputError(`Unsupported mode: ${unsupported}.`);
@@ -118,6 +117,4 @@ export function createHandler({ env }: HandlerOptions) {
 
 export const handleRequest = createHandler({ env: (name) => Deno.env.get(name) });
 
-if (typeof Deno !== "undefined") {
-  Deno.serve(handleRequest);
-}
+Deno.serve(handleRequest);

@@ -97,16 +97,19 @@ script ed eseguirli nell'ordine seguente:
 I campi antifrode opzionali sono `SESSION_TOKEN`, `PHONE_FINGER_PRINT`, `IP`,
 `USER_AGENT` e `UNIQ_SUBSCRIPTION_ID`.
 
-## Verifica locale
+## Esecuzione dei test
+
+Eseguire gli smoke test singolarmente, uno per ogni operazione, contro una Edge
+Function locale o remota attiva. Configurare URL, token e identificativi come
+indicato sopra. Gli script effettuano chiamate reali; quelli POST modificano i dati.
+
+Gli status POST predefiniti sono `201`, come nell'OpenAPI; `EXPECTED_STATUS` permette
+di testarli anche contro ambienti che restituiscono uno status differente.
+
+I test dell'SDK rimangono separati e usano risposte HTTP simulate:
 
 ```sh
 npm ci --prefix sdk
-./script/test.sh
+npm --prefix sdk run check
+npm --prefix sdk test
 ```
-
-Richiede anche Node.js >=22.18 per importare direttamente `index.ts`.
-Compila l'SDK, verifica i tipi e il pacchetto ESM, poi testa il proxy e ogni smoke
-test con upstream simulato, senza chiamate HTTP reali o creazione di voti.
-Gli status POST predefiniti sono `201`, come nell'OpenAPI; `EXPECTED_STATUS` permette
-di testarli anche contro ambienti che restituiscono uno status differente.
-I parametri locali e le credenziali condivise non vengono modificati dalla suite.

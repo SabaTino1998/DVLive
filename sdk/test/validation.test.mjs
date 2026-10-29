@@ -1,10 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CreateVoterBody, AddVoteBody, CastVoteBody, ApiService, ApiValidationError } from "@digitalvirgo/dvlive-api";
+import { ApiService, ApiValidationError } from "@digitalvirgo/dvlive-api";
 
-import { CastVoteChoiceRequest } from "../dist/requests/voter.js";
+import { CreateVoterBody, AddVoteBody, CastVoteBody, CastVoteChoiceRequest } from "../dist/requests/voter.js";
 
-import { makeRequest } from "./responses.fixture.mjs";
 
 const config = { environment: "STAG" };
 const vote = { choiceUuid: "choice", nbVotes: 1 };
@@ -24,7 +23,7 @@ for (const [method, bodies] of Object.entries(invalidBodies)) {
     let headerCalls = 0;
     const api = new ApiService({ ...config, headers: () => { headerCalls++; return {}; } });
     for (const body of bodies) {
-      assert.throws(() => makeRequest(method, { showVoteUuid: "show", userRef: "voter", body }), (error) => {
+      await assert.rejects(api[method]({ showVoteUuid: "show", userRef: "voter" }, body), (error) => {
         assert.ok(error instanceof ApiValidationError);
         assert.equal(error.name, "ApiValidationError");
         assert.ok(error.message);
@@ -50,8 +49,7 @@ test("valid optional fields and enum values pass validation without mutating req
   ];
   for (const [method, body] of cases) {
     const before = structuredClone(body);
-    const request = makeRequest(method, { showVoteUuid: "show", userRef: "voter", body });
-    const result = await api[method](request);
+    const result = await api[method]({ ...body, showVoteUuid: "show", userRef: "voter" });
     assert.equal(result.status, 201);
     assert.deepEqual(body, before);
     const options = upstream.mock.calls.at(-1).arguments[1];
