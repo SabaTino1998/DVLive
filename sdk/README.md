@@ -259,7 +259,55 @@ used directly outside Supabase. `ApiHttpError` represents any non-2xx response, 
 bodies. `ApiResponseError` represents successful responses with missing, malformed,
 non-object JSON, or fields that do not match the response contract. `ApiRequestError` includes the underlying failure as `cause`.
 Invalid environment or timeout configuration throws `TypeError`.
-No request or credential logging is performed by the SDK.
+Logging is disabled by default. When enabled, credentials and personal fields are redacted.
+
+## Logging
+
+Logging is opt-in and configured per `ApiService` instance. The SDK does not read
+`.env` directly: the application or Edge Function passes the environment values.
+
+```ts
+const api = new ApiService({
+  environment: env("DVLIVE_ENV"),
+  headers: () => ({ Authorization: `Bearer ${token}` }),
+  logEnable: env("DVLIVE_LOG_ENABLE"),
+  logLevel: env("DVLIVE_LOG_LEVEL"),
+});
+```
+
+```dotenv
+DVLIVE_LOG_ENABLE=TRUE
+DVLIVE_LOG_LEVEL=DEBUG
+```
+
+| Setting | Values | Missing value |
+| --- | --- | --- |
+| `DVLIVE_LOG_ENABLE` → `logEnable` | `TRUE`, `FALSE` (or booleans in code) | `FALSE` |
+| `DVLIVE_LOG_LEVEL` → `logLevel` | `WARNING`, `INFO`, `DEBUG` | `WARNING` |
+
+Without `DVLIVE_LOG_ENABLE=TRUE`, no SDK logs are emitted, even if a level is set.
+`logLevel` is ignored while logging is disabled. Strings are trimmed and compared
+case-insensitively. Invalid enable values or enabled log levels throw `TypeError`.
+The public `LogLevel` type is available for application annotations.
+
+- `WARNING`: HTTP failures, network errors, timeouts, invalid JSON and response decoding failures.
+- `INFO`: includes WARNING, plus request start, operation, method, sanitized URL,
+  HTTP status and duration in milliseconds.
+- `DEBUG`: includes INFO, plus sanitized request and parsed response bodies.
+
+Output uses `console.warn`, `console.info`, and `console.debug`, prefixed with
+`[DVLive][LEVEL]`. Logs appear in the runtime executing the SDK: the terminal
+running `supabase functions serve`, or the deployed function logs in the Supabase
+dashboard. For SDK consumers running in a browser or React Native, use the
+browser/development console and enable its debug/verbose filter for DEBUG messages.
+In this repository Expo calls the Edge Function, so SDK logs are in Supabase;
+SmartUser client logs remain separate.
+
+Authorization headers are never printed. User references in URL paths, tokens,
+contact details, names and other sensitive fields are redacted. Non-JSON raw
+bodies and raw exception causes are omitted. Returned API data and errors remain
+unchanged. Logging failures never affect requests. Invalid input rejected before
+an HTTP request is not part of the transport log.
 
 ## Supabase integration
 

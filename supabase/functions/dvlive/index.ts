@@ -90,6 +90,8 @@ export function createHandler({ env }: HandlerOptions) {
       try {
         api = new ApiService({
           environment: env("DVLIVE_ENV"),
+          logEnable: env("DVLIVE_LOG_ENABLE"),
+          logLevel: env("DVLIVE_LOG_LEVEL"),
           headers: () => ({ Authorization: `Bearer ${token}` }),
         });
       } catch {

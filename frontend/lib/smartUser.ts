@@ -48,7 +48,7 @@ export function setupSmartUser(): Promise<SmartUserRN> {
   setupPromise = (async () => {
     const sdk = await createInstance();
     const secret = process.env.EXPO_PUBLIC_SMARTUSER_SECRET;
-    if (!secret || secret === '<secret>') throw new Error('Set EXPO_PUBLIC_SMARTUSER_SECRET in web/.env.');
+    if (!secret || secret === '<secret>') throw new Error('Set EXPO_PUBLIC_SMARTUSER_SECRET in frontend/.env.');
     const env = process.env.EXPO_PUBLIC_SMARTUSER_ENV || 'PROD';
     if (env !== 'STAG' && env !== 'PROD') throw new Error('The SmartUser environment must be STAG or PROD.');
     const opts: SetupOptions = { env };

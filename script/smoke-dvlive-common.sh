@@ -2,16 +2,17 @@
 # Shared helpers for the DVLive smoke tests, following the Atom runner conventions.
 set -euo pipefail
 
-# Shared configuration: edit these defaults once for all smoke tests. No export needed.
+# Shared configuration is loaded from script/config.json. No export needed.
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/smoke-config.sh"
 SUPABASE_URL="${SUPABASE_URL:-http://127.0.0.1:54321}"
-SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY:-sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz}"
-DVLIVE_BEARER_TOKEN="${DVLIVE_BEARER_TOKEN:-dev-auth-token}"
+SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY:-}"
+DVLIVE_BEARER_TOKEN="${DVLIVE_BEARER_TOKEN:-}"
 # Leave SUPABASE_ANON_KEY empty for local auto-detection.
 
 case "${1:-}" in
   --help|-h)
     echo "Usage: $0"
-    echo 'Set URL and credentials in script/smoke-dvlive-common.sh; no export is needed.'
+    echo 'Set URL and credentials in script/config.json; no export is needed.'
     echo 'Set mode parameters in the local configuration block of each test; see script/README.md.'
     exit 0 ;;
   '') ;;
@@ -39,7 +40,7 @@ resolve_anon_key() {
   printf '%s' 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0'
 }
 
-SUPABASE_ANON_KEY="$(resolve_anon_key)"
+SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY:-}"
 FN="${SUPABASE_URL%/}/functions/v1/dvlive"
 TMP=$(mktemp)
 trap 'rm -f "$TMP"' EXIT
@@ -66,7 +67,7 @@ dvlive_request() {
     --header "apikey: $SUPABASE_ANON_KEY")
   if [[ -n "$mode" ]]; then
     if [[ "$require_token" == true ]]; then
-      [[ -n "${DVLIVE_BEARER_TOKEN:-}" ]] || { echo 'FAIL: set DVLIVE_BEARER_TOKEN in script/smoke-dvlive-common.sh' >&2; exit 1; }
+      [[ -n "${DVLIVE_BEARER_TOKEN:-}" ]] || { echo 'FAIL: set DVLIVE_BEARER_TOKEN in script/config.json' >&2; exit 1; }
       options+=(--header "bearer-token: $DVLIVE_BEARER_TOKEN")
     fi
     url+="?mode=$(jq -rn --arg value "$mode" '$value | @uri')"

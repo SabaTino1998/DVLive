@@ -50,6 +50,8 @@ Pass the environment value directly to the SDK:
 ```ts
 const api = new ApiService({
   environment: env("DVLIVE_ENV"),
+  logEnable: env("DVLIVE_LOG_ENABLE"),
+  logLevel: env("DVLIVE_LOG_LEVEL"),
   headers: () => ({ Authorization: `Bearer ${token}` }),
 });
 ```
@@ -67,6 +69,58 @@ DV Live token in the server environment or log it.
 Supabase gateway authentication is separate from DV Live authentication.
 `verify_jwt` is currently `false` in `config.toml`; do not use the caller's
 Supabase `Authorization` header as the DV Live token.
+
+## SDK logging
+
+The SDK owns logging. The Edge Function only reads the environment values and
+passes them to `ApiService` as shown above. Do not add another logger, duplicate
+level parsing, or read logging settings from caller headers or query parameters.
+Keep configuration and credentials local to each request.
+
+Configure logging in `supabase/.env`, loaded with `--env-file supabase/.env`:
+
+```dotenv
+DVLIVE_LOG_ENABLE=TRUE
+DVLIVE_LOG_LEVEL=DEBUG
+```
+
+| Environment variable | SDK option | Values | Default when absent |
+| --- | --- | --- | --- |
+| `DVLIVE_LOG_ENABLE` | `logEnable` | `TRUE`, `FALSE` | `FALSE` |
+| `DVLIVE_LOG_LEVEL` | `logLevel` | `WARNING`, `INFO`, `DEBUG` | `WARNING` |
+
+Without `DVLIVE_LOG_ENABLE=TRUE`, no SDK logs are emitted, even if a level is
+configured. The level is ignored while logging is disabled. The SDK trims and
+normalizes string values case-insensitively. Invalid enable values or invalid
+levels when enabled are SDK configuration errors: preserve the existing HTTP
+500 configuration response. Keep logging disabled in `.env.example` by default
+and preserve existing local settings when updating environment files.
+
+- `WARNING`: upstream HTTP failures, network failures, timeouts, invalid JSON,
+  and response decoding failures.
+- `INFO`: includes WARNING and adds request start, operation, method, sanitized
+  URL, response status, and duration in milliseconds.
+- `DEBUG`: includes INFO and adds sanitized request and parsed response bodies.
+
+Logs use `[DVLive][LEVEL]` prefixes through `console.warn`, `console.info`, and
+`console.debug`. Locally they appear in the terminal running
+`supabase functions serve`; after deployment they appear in the function logs
+in the Supabase dashboard. They are not included in HTTP responses or emitted
+in the Expo browser console. SmartUser client debug settings are independent.
+Restart local function serving after changing `.env`; update the deployed
+function environment for remote logging configuration.
+
+The SDK omits authentication headers and redacts user references, tokens,
+contact details, names, and other sensitive fields. Do not bypass that
+sanitization by logging raw requests, responses, headers, or error causes in
+the adapter. Logging must not change API results or error handling. Input
+rejected before an SDK HTTP request is outside the transport log.
+
+Missing or unsupported modes must still return the catalog before reading
+logging configuration or constructing `ApiService`. Verify disabled defaults,
+WARNING as the default enabled level, level filtering, credential redaction,
+and environment forwarding with mocked SDK/adapter tests. See
+[SDK logging](../sdk/README.md#logging) for the public configuration contract.
 
 ## Modes and HTTP input
 

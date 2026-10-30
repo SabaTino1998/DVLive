@@ -2,14 +2,11 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# Source local values without exporting credentials to child processes.
-ENV_FILE="$SCRIPT_DIR/../.env"
-[[ -f "$ENV_FILE" ]] || { echo 'FAIL: configure the repository .env (see .env.example)' >&2; exit 1; }
-source "$ENV_FILE"
+source "$SCRIPT_DIR/smoke-config.sh"
 
 command -v node >/dev/null || { echo 'FAIL: Node.js >=18 required' >&2; exit 1; }
 for config_name in EXPO_PUBLIC_SMARTUSER_APP_ID EXPO_PUBLIC_SMARTUSER_SECRET EXPO_PUBLIC_SMARTUSER_ENV SMART_USER_USERNAME SMART_USER_PASSWORD; do
-  [[ -n "${!config_name:-}" && "${!config_name:-}" != '<secret>' ]] || { echo "FAIL: configure $config_name in the repository .env" >&2; exit 1; }
+  [[ -n "${!config_name:-}" && "${!config_name:-}" != '<secret>' && "${!config_name:-}" != '<smartuser-secret>' && "${!config_name:-}" != '<test-user-email>' && "${!config_name:-}" != '<test-user-password>' ]] || { echo "FAIL: configure $config_name in script/config.json" >&2; exit 1; }
 done
 
 # Creates an EMAIL identity, then logs in and prints its N_ token.

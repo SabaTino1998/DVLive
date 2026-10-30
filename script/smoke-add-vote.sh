@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/smoke-config.sh"
+
 # Local configuration: edit the defaults after :- below; no export is needed.
 SHOW_VOTE_UUID="${SHOW_VOTE_UUID:-11111111-1111-4111-8111-111111111101}"
 USER_REF="${USER_REF:-N_35c4251d9ca734b136a4}" # Paste the N_ token returned by smoke-smartuser-token.sh.
@@ -11,7 +13,7 @@ OUT_FILE="${OUT_FILE:-}"
 
 # Direct DV Live configuration: no Supabase gateway or SDK.
 DVLIVE_ENV="${DVLIVE_ENV:-STAG}"
-DVLIVE_BEARER_TOKEN="${DVLIVE_BEARER_TOKEN:-dev-auth-token}"
+DVLIVE_BEARER_TOKEN="${DVLIVE_BEARER_TOKEN:-}"
 
 command -v curl >/dev/null || { echo 'FAIL: curl required' >&2; exit 1; }
 command -v jq >/dev/null || { echo 'FAIL: jq required' >&2; exit 1; }
@@ -20,7 +22,7 @@ case "$DVLIVE_ENV" in
   PROD) DVLIVE_BASE_URL='https://webshow-engine.dv-live.com' ;;
   *) echo 'FAIL: DVLIVE_ENV must be STAG or PROD' >&2; exit 1 ;;
 esac
-[[ -n "$DVLIVE_BEARER_TOKEN" ]] || { echo 'FAIL: configure DVLIVE_BEARER_TOKEN in smoke-add-vote.sh' >&2; exit 1; }
+[[ -n "$DVLIVE_BEARER_TOKEN" ]] || { echo 'FAIL: configure DVLIVE_BEARER_TOKEN in script/config.json' >&2; exit 1; }
 [[ -n "$SHOW_VOTE_UUID" ]] || { echo 'FAIL: SHOW_VOTE_UUID required' >&2; exit 1; }
 [[ "$USER_REF" == N_* ]] || { echo 'FAIL: paste the SmartUser N_ token into USER_REF in this smoke test.' >&2; exit 1; }
 case "$ADDITIONAL_VOTE_TYPE" in

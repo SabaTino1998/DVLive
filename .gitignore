@@ -8,8 +8,9 @@ supabase/.branches/
 sdk/dist/
 *.tsbuildinfo
 test-support/.npmrc
-web/.npmrc
-web/dist/
-web/.expo/
-web/android/
-web/ios/
+frontend/.npmrc
+frontend/dist/
+frontend/.expo/
+frontend/android/
+frontend/ios/
+script/config.json

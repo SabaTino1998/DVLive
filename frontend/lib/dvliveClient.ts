@@ -8,7 +8,7 @@ export class DvLiveError extends Error {
 export function createDvLiveClient(config: DvLiveConfig, token: () => string, send: typeof fetch = fetch) {
   async function request<T>(mode: string, params: Record<string, string>, body?: object): Promise<T> {
     if (!config.url || !config.key || !config.bearer || !config.showUuid) {
-      throw new Error('Complete the Supabase and DV Live configuration in web/.env.');
+      throw new Error('Complete the Supabase and DV Live configuration in frontend/.env.');
     }
     if (config.key.startsWith('sb_secret_')) throw new Error('Use a Supabase anon or publishable key instead of a secret key.');
     const headers: Record<string, string> = { Accept: 'application/json', apikey: config.key, 'bearer-token': config.bearer };

@@ -7,18 +7,18 @@
 
 ## App Expo (React Native)
 
-La cartella `web/` contiene l’app Expo SDK 54 per web, iOS e Android, con
+La cartella `frontend/` contiene l’app Expo SDK 54 per web, iOS e Android, con
 inizializzazione SmartUser nel client come in Bravigo.
 
 ```sh
-cd web
+cd frontend
 npm install
 npm run web
 ```
 
-Expo carica `web/.env` automaticamente. Il sito è normalmente su
+Expo carica `frontend/.env` automaticamente. Il sito è normalmente su
 `http://localhost:8081`. La vecchia applicazione Vite/Express è stata sostituita.
-Setup e flussi sono descritti in [web/README.md](web/README.md).
+Setup e flussi sono descritti in [frontend/README.md](frontend/README.md).
 
 ## Runner
 
@@ -80,6 +80,19 @@ curl 'http://127.0.0.1:54321/functions/v1/dvlive?mode=castVote&showVoteUuid=SHOW
 ```dotenv
 DVLIVE_ENV=STAG
 ```
+
+Optional SDK logging is configured in the same `supabase/.env` file:
+
+```dotenv
+DVLIVE_LOG_ENABLE=TRUE
+DVLIVE_LOG_LEVEL=DEBUG
+```
+
+Missing keys default to logging disabled (`FALSE`) and level `WARNING`.
+Supported levels are `WARNING`, `INFO`, and `DEBUG`. The Edge Function passes
+these settings to the SDK; output appears in the Supabase function terminal/logs.
+See [SDK logging](sdk/README.md#logging) for details. The local template keeps
+logging disabled until explicitly enabled.
 
 The SDK selects the base URL according to the environment: `STAG` uses
 `https://dev-webshow-engine.dv-live.com`, while `PROD` uses
@@ -143,7 +156,7 @@ The scripts follow the `atom` conventions: one Bash file per mode, a shared help
 and local variables editable at the start of each test. They require `curl` and `jq`.
 
 ```sh
-# Set the URL and token in script/smoke-dvlive-common.sh.
+# Set shared credentials and show UUID in script/config.json.
 # Set the identifiers in each test's local configuration block.
 ./script/smoke-get-show-vote.sh
 ./script/smoke-get-show-vote-choice.sh
@@ -151,7 +164,7 @@ and local variables editable at the start of each test. They require `curl` and 
 ```
 
 No `export` is needed. For remote Supabase, set `SUPABASE_URL` and
-`SUPABASE_ANON_KEY` in `script/smoke-dvlive-common.sh`, along with
+`SUPABASE_ANON_KEY` in `script/config.json`, along with
 `DVLIVE_BEARER_TOKEN`.
 Locally, the default URL is `http://127.0.0.1:54321`; the key is resolved
 as in `atom`: from the environment, then `supabase status -o json`, then the local demo key.

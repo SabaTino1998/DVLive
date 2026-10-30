@@ -53,3 +53,7 @@ import { GetShowVoteRequest } from "@digitalvirgo/dvlive-api";
 import { CastVoteBody } from "@digitalvirgo/dvlive-api";
 // @ts-expect-error Vote entry classes are internal; use plain CastVoteChoiceInput values.
 import { CastVoteChoiceRequest } from "@digitalvirgo/dvlive-api";
+
+import type { LogLevel } from "@digitalvirgo/dvlive-api";
+const logLevel: LogLevel = "DEBUG";
+new ApiService({ environment: "STAG", logEnable: "TRUE", logLevel });

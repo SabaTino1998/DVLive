@@ -1,5 +1,6 @@
 export { ApiService } from "./ApiService.ts";
 export type { ApiServiceConfig } from "./ApiService.ts";
+export type { LogLevel } from "./logger.ts";
 export { ApiHttpError, ApiRequestError, ApiResponseError, ApiValidationError } from "./ApiErrors.ts";
 export { ApiResponse } from "./models/api-response.ts";
 export type { ApiResult } from "./models/api-result.ts";

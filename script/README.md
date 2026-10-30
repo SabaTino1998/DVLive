@@ -5,18 +5,24 @@ una Edge Function DVLive attiva; lo smoke `add-vote` chiama direttamente DV Live
 Seguono la struttura degli smoke test di `atom`: uno script per mode, helper comune,
 variabili locali in ogni script, URL e stato HTTP stampati, risposta JSON verificata.
 
-URL e credenziali sono configurati una sola volta all'inizio di
-`smoke-dvlive-common.sh`. Modificare i valori dopo `:-`; non serve eseguire `export`:
+La configurazione condivisa degli smoke è in `script/config.json`, escluso da Git.
+Non serve `export` e gli smoke non leggono `frontend/.env`. Per un nuovo checkout:
 
 ```sh
-SUPABASE_URL="${SUPABASE_URL:-http://127.0.0.1:54321}"
-SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY:-}"
-DVLIVE_BEARER_TOKEN="${DVLIVE_BEARER_TOKEN:-TOKEN_DV_LIVE}"
+cp script/config.example.json script/config.json
 ```
 
-Lasciare `SUPABASE_ANON_KEY` vuota per il rilevamento locale automatico.
-Ogni test mantiene solo i propri parametri nel blocco iniziale, per esempio
-`SHOW_VOTE_UUID`, `CHOICE_UUID`, `USER_REF` e i campi del body.
+Compilare i campi stringa del JSON: App ID, secret e ambiente SmartUser,
+username/email e password del test, bearer DV Live e `SHOW_VOTE_UUID`.
+`SUPABASE_URL` e `SUPABASE_ANON_KEY` sono opzionali; lasciare la chiave vuota
+per il rilevamento locale automatico. `DVLIVE_ENV` opzionale seleziona STAG/PROD
+per lo smoke add-vote diretto (default STAG).
+
+`smoke-config.sh` legge solo le chiavi riconosciute con jq, senza eseguire il
+contenuto del JSON. Conserva i caratteri speciali dei secret.
+I valori condivisi del JSON prevalgono sui default degli script.
+Ogni test mantiene i parametri specifici nel blocco locale: `CHOICE_UUID`,
+`USER_REF`, `EMAIL`, `PHONE` e i campi del body. Il token N_ resta da copiare a mano.
 Poi eseguire dalla root del repository:
 
 ```sh
@@ -35,12 +41,9 @@ come in Bravigo. Configurarlo prima di installare le dipendenze dell'helper (Nod
 npm install --prefix test-support
 ```
 
-Configurare il file `.env` nella root del repository (escluso da Git;
-vedere `.env.example`). Entrambi gli smoke SmartUser lo caricano automaticamente
-senza `export`, indipendentemente dalla directory da cui si eseguono:
-`EXPO_PUBLIC_SMARTUSER_APP_ID`, `EXPO_PUBLIC_SMARTUSER_SECRET`, `EXPO_PUBLIC_SMARTUSER_ENV` (`STAG` o `PROD`),
-`SMART_USER_USERNAME` e `SMART_USER_PASSWORD`.
-`smartuser.test` è un App ID, non seleziona l'ambiente. Poi eseguire:
+Configurare in `script/config.json` `EXPO_PUBLIC_SMARTUSER_APP_ID`,
+`EXPO_PUBLIC_SMARTUSER_SECRET`, `EXPO_PUBLIC_SMARTUSER_ENV`, `SMART_USER_USERNAME`
+e `SMART_USER_PASSWORD`. Poi eseguire:
 
 ```sh
 bash script/smoke-smartuser-token.sh
@@ -68,9 +71,8 @@ originale e potrebbe contenerlo.
 
 ## Creare un utente SmartUser
 
-Configurare nel medesimo `.env` della root queste variabili:
-`SMART_USER_USERNAME` (email del nuovo utente), `SMART_USER_PASSWORD`,
-`EXPO_PUBLIC_SMARTUSER_APP_ID`, `EXPO_PUBLIC_SMARTUSER_SECRET` e `EXPO_PUBLIC_SMARTUSER_ENV`.
+Configurare App ID, secret, ambiente, `SMART_USER_USERNAME` (email del nuovo utente)
+e `SMART_USER_PASSWORD` in `script/config.json`.
 Non occorre eseguire `export`. Dopo aver installato le dipendenze come sopra:
 
 ```sh
@@ -127,17 +129,16 @@ la riconosce. Include descrizioni in inglese e parametri richiesti; lo smoke tes
 verifica il caso senza mode e i valori non validi `unknown` e `__proto__`.
 Il catalogo non richiede il token DV Live. L'autenticazione del gateway dipende
 da `verify_jwt` nel progetto Supabase; gli script inviano comunque gli header Supabase.
-Per progetti remoti inserire URL e chiave Supabase nel blocco condiviso di
-`smoke-dvlive-common.sh`.
+Per progetti remoti inserire URL e chiave Supabase in `script/config.json`.
 
 Quando la verifica JWT del gateway è abilitata, usare un JWT accettato dal progetto,
 per esempio una chiave anon JWT legacy. Le nuove chiavi publishable non sono JWT.
-L'unica variabile server in `supabase/.env` è `DVLIVE_ENV=STAG` oppure
+La variabile server obbligatoria in `supabase/.env` è `DVLIVE_ENV=STAG` oppure
 `DVLIVE_ENV=PROD`, caricata passando `--env-file supabase/.env` a
 `supabase functions serve dvlive`. L'SDK configura il base URL: `STAG` usa
 `https://dev-webshow-engine.dv-live.com`, `PROD` usa `https://webshow-engine.dv-live.com`. Il token DV Live resta
 nella configurazione comune degli smoke test e viene passato nelle chiamate.
-Non occorre un file JSON di configurazione per gli smoke test.
+Il file `script/config.json` è dedicato agli smoke e indipendente dalla configurazione Expo.
 
 ## Operazioni POST
 
@@ -155,9 +156,10 @@ script ed eseguirli nell'ordine seguente:
 `createVoter` accetta `EMAIL` e `PHONE` opzionali. Se è disponibile solo l’email,
 impostare `EMAIL` e lasciare `PHONE` vuota: il campo `phone` viene omesso dal JSON.
 Questi campi sono dati del voter e non credenziali per il login SmartUser.
-`smoke-add-vote.sh` è indipendente da Supabase e dall’SDK. Configurare nel suo blocco
-locale `DVLIVE_ENV` (`STAG` o `PROD`), `DVLIVE_BEARER_TOKEN`, `SHOW_VOTE_UUID`,
-`USER_REF`, `NB_POINTS` e `ADDITIONAL_VOTE_TYPE`, senza `export`.
+`smoke-add-vote.sh` è indipendente da Supabase e dall’SDK, ma legge lo stesso
+`script/config.json` per `DVLIVE_BEARER_TOKEN`, `SHOW_VOTE_UUID` e l’eventuale
+`DVLIVE_ENV`. `USER_REF`, `NB_POINTS` e `ADDITIONAL_VOTE_TYPE` restano nel
+blocco locale dello smoke, senza `export`.
 Invia con curl `POST /show-vote/{showVoteUuid}/voter/{userRef}/add-vote`, con body
 `{ "additionalVoteType": "VIDEO", "nbPoints": 1 }` e header
 `Authorization: Bearer <token DV Live>`. Non usa chiavi né header Supabase.
@@ -190,3 +192,9 @@ npm ci --prefix sdk
 npm --prefix sdk run check
 npm --prefix sdk test
 ```
+
+Per abilitare il logger dell’SDK nella Edge Function, impostare in `supabase/.env`
+`DVLIVE_LOG_ENABLE=TRUE` e `DVLIVE_LOG_LEVEL=WARNING`, `INFO` o `DEBUG`.
+Se assenti, i default sono `FALSE` e `WARNING`: nessun log viene emesso.
+I log si vedono nel terminale Supabase o nei log della funzione pubblicata,
+non nell’output curl degli smoke. Riavviare `supabase functions serve` dopo la modifica.

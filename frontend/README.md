@@ -6,7 +6,7 @@ su web, iOS e Android. Non usa Vite, Express o cookie di sessione proprietari.
 ## Avvio web
 
 ```bash
-cd web
+cd frontend
 npm install
 npm run web
 ```
@@ -17,7 +17,7 @@ Se il vecchio server Vite è ancora attivo, interromperlo con Ctrl+C.
 `npm run ios` e `npm run android` avviano rispettivamente simulatore iOS ed emulatore Android.
 
 Il file locale `.npmrc` configura lo scope privato Digital Virgo per SmartUser ed è escluso da Git.
-La configurazione dell’app è in `web/.env`, caricata automaticamente da Expo, senza `export`.
+La configurazione dell’app è in `frontend/.env`, caricata automaticamente da Expo, senza `export`.
 Vedere `.env.example`. Non inserire username e password personali nel bundle:
 vengono immessi nel form di login o signup.
 
@@ -33,7 +33,7 @@ supabase start
 supabase functions serve dvlive --env-file supabase/.env
 ```
 
-Su un dispositivo fisico, `EXPO_PUBLIC_SUPABASE_URL` deve usare l’IP LAN del Mac,
+Su un dispositivo fisico, `SUPABASE_URL` deve usare l’IP LAN del Mac,
 non `127.0.0.1`; sull’emulatore Android il Mac è normalmente raggiungibile da `10.0.2.2`.
 Expo può chiedere un runtime compatibile con SDK 54: usare un development build
 compatibile se la versione installata di Expo Go supporta solo SDK più recenti.
@@ -49,7 +49,7 @@ compatibile se la versione installata di Expo Go supporta solo SDK più recenti.
   Come Bravigo, il signup fornisce già il token: non viene eseguito un secondo login.
 - Login: `loginWithEmail → getVoter` e `getShowVote`.
 - Dettaglio: Expo Router apre `/choices/[uuid]` ed esegue `getShowVoteChoice`.
-- `PRESENT` viene visualizzato come **IN THE HOUSE**, `EVICTED` come **EVICTED**.
+- `PRESENT` viene visualizzato come **PRESENT**, `EVICTED` come **EVICTED**.
 
 Tutte le chiamate DV Live passano direttamente dalla Edge Function Supabase.
 `userRef`/`uniqRef` usano sempre il token `N_…` corrente dell’SDK.
@@ -67,3 +67,17 @@ npm run build:web
 ```
 
 I test dei flussi usano risposte simulate e non creano account né voter reali.
+
+## Interfaccia
+
+Interfaccia essenziale in inglese con terminologia DVLive: round, choices e choice.
+Il saldo `remainingPoints` è presentato come **Available votes**; `standardPoint`,
+`additionalPoint` e `purchasedPoint` come Standard, Additional e Purchased votes.
+I nomi dei campi API restano invariati.
+
+La configurazione DV Live usa i nomi originali `SUPABASE_URL`,
+`SUPABASE_ANON_KEY`, `DVLIVE_BEARER_TOKEN` e `SHOW_VOTE_UUID`, senza alias
+`EXPO_PUBLIC_` duplicati. `app.config.ts` li seleziona nel campo `extra.dvlive`
+e il client li legge tramite Expo Constants. Questi valori restano visibili
+nella configurazione pubblica dell’app; cambiare il nome non li rende segreti.
+Riavviare Expo dopo le modifiche a queste variabili.

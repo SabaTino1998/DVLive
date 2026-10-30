@@ -1,0 +1,11 @@
+{
+  "EXPO_PUBLIC_SMARTUSER_APP_ID": "test.bolt.app",
+  "EXPO_PUBLIC_SMARTUSER_SECRET": "<smartuser-secret>",
+  "EXPO_PUBLIC_SMARTUSER_ENV": "STAG",
+  "SMART_USER_USERNAME": "<test-user-email>",
+  "SMART_USER_PASSWORD": "<test-user-password>",
+  "DVLIVE_BEARER_TOKEN": "<dvlive-bearer-token>",
+  "SHOW_VOTE_UUID": "11111111-1111-4111-8111-111111111101",
+  "SUPABASE_URL": "http://127.0.0.1:54321",
+  "SUPABASE_ANON_KEY": ""
+}
