@@ -5,7 +5,7 @@ node_modules/
 !.env.example
 supabase/.temp/
 supabase/.branches/
-sdk/dist/
+supabase/functions/_shared/sdk/dist/
 *.tsbuildinfo
 test-support/.npmrc
 frontend/.npmrc

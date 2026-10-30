@@ -1,6 +1,6 @@
 # DVLive
 
-- `sdk/`: TypeScript package `@digitalvirgo/dvlive-api`, with typed responses and HTTP metadata.
+- `supabase/functions/_shared/sdk/`: TypeScript package `@digitalvirgo/dvlive-api`, with typed responses and HTTP metadata.
 - `runner/`: original Node.js runner, client, configuration, and OpenAPI specification.
 - `supabase/`: single **DVLive** Edge Function and backend configuration.
 - `script/`: individual smoke tests; `add-vote` calls DV Live directly, other voting operations use Supabase.
@@ -91,7 +91,7 @@ DVLIVE_LOG_LEVEL=DEBUG
 Missing keys default to logging disabled (`FALSE`) and level `WARNING`.
 Supported levels are `WARNING`, `INFO`, and `DEBUG`. The Edge Function passes
 these settings to the SDK; output appears in the Supabase function terminal/logs.
-See [SDK logging](sdk/README.md#logging) for details. The local template keeps
+See [SDK logging](supabase/functions/_shared/sdk/README.md#logging) for details. The local template keeps
 logging disabled until explicitly enabled.
 
 The SDK selects the base URL according to the environment: `STAG` uses
@@ -138,9 +138,9 @@ return json(result.data, result.status);
 ```
 
 The wrapper remains internal to the SDK: the public JSON is the mapped `result.data`.
-The SDK decodes DV Live responses in `sdk/src/responses/`, then converts them
+The SDK decodes DV Live responses in `supabase/functions/_shared/sdk/src/responses/`, then converts them
 into public model instances through their static `fromResponse()` factories in
-`sdk/src/models/`. Customize output fields and transformations in those factories;
+`supabase/functions/_shared/sdk/src/models/`. Customize output fields and transformations in those factories;
 the Edge Function receives and serializes the resulting model.
 Current models keep existing field names and omit additional upstream properties.
 Malformed response fields are rejected before DTO conversion.
@@ -148,7 +148,7 @@ The actual status code is preserved. HTTP errors retain their original status an
 request parameter or body validation errors become `400`, network or decoding errors become `502`, and timeouts become `504`.
 The default timeout is 15 seconds; no automatic retries are performed.
 
-Package structure, interfaces, errors, and usage: [sdk/README.md](sdk/README.md).
+Package structure, interfaces, errors, and usage: [supabase/functions/_shared/sdk/README.md](supabase/functions/_shared/sdk/README.md).
 
 ## Smoke tests
 
@@ -174,8 +174,8 @@ Details, POST scripts, and available variables: [script/README.md](script/README
 SDK tests use mocked HTTP responses and run separately from the live smoke tests:
 
 ```sh
-npm ci --prefix sdk
-npm --prefix sdk test
+npm ci --prefix supabase/functions/_shared/sdk
+npm --prefix supabase/functions/_shared/sdk test
 ```
 
 Vote crediting is available only through `bash script/smoke-add-vote.sh`, which uses

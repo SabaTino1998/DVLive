@@ -311,7 +311,7 @@ an HTTP request is not part of the transport log.
 
 ## Supabase integration
 
-The Edge Function maps the package name to `sdk/src/index.ts` through its
+The Edge Function maps the package name to `supabase/functions/_shared/sdk/src/index.ts` through its
 `deno.json`, so local serving and deployment do not require npm publication or a
 prebuilt `dist/`. Set the Supabase environment file to:
 
@@ -344,9 +344,9 @@ the development or verification commands below.
 From the repository root (Node.js >=22.18 for development tests):
 
 ```sh
-npm ci --prefix sdk
-npm --prefix sdk run check
-npm --prefix sdk test
+npm ci --prefix supabase/functions/_shared/sdk
+npm --prefix supabase/functions/_shared/sdk run check
+npm --prefix supabase/functions/_shared/sdk test
 ```
 
 `check` checks source types, the public method contracts and the Edge Function.
@@ -359,8 +359,8 @@ Verify the Edge Function separately by running the relevant smoke script for eac
 operation against an active local or remote function; see `script/README.md`.
 
 ```sh
-npm --prefix sdk run build
-npm pack ./sdk --dry-run
+npm --prefix supabase/functions/_shared/sdk run build
+npm pack ./supabase/functions/_shared/sdk --dry-run
 ```
 
 The package exports only its root API. Published artifacts include `dist/` and
@@ -369,4 +369,4 @@ script builds the package before packaging. The npm scope must be configured
 for the target registry before a separate publication step.
 
 Vote crediting (`add-vote`) is intentionally excluded from the SDK and Edge Function.
-Use the standalone direct-curl smoke test `../script/smoke-add-vote.sh`.
+Use the standalone direct-curl smoke test `script/smoke-add-vote.sh`.

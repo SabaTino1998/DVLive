@@ -120,7 +120,7 @@ Missing or unsupported modes must still return the catalog before reading
 logging configuration or constructing `ApiService`. Verify disabled defaults,
 WARNING as the default enabled level, level filtering, credential redaction,
 and environment forwarding with mocked SDK/adapter tests. See
-[SDK logging](../sdk/README.md#logging) for the public configuration contract.
+[SDK logging](functions/_shared/sdk/README.md#logging) for the public configuration contract.
 
 ## Modes and HTTP input
 

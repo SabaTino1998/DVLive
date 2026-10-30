@@ -6,7 +6,7 @@ import { show } from "./responses.fixture.mjs";
 
 // Exercise the real HTTP adapter against the built public package without Deno
 // or modifying its deployment import map / runtime bootstrap.
-const source = await readFile(new URL("../../supabase/functions/dvlive/index.ts", import.meta.url), "utf8");
+const source = await readFile(new URL("../../../dvlive/index.ts", import.meta.url), "utf8");
 const adapter = source.slice(0, source.indexOf("export const handleRequest"))
   .replace('from "@digitalvirgo/dvlive-api"', `from ${JSON.stringify(new URL("../dist/index.js", import.meta.url).href)}`);
 const { outputText } = ts.transpileModule(adapter, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } });

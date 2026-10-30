@@ -7,7 +7,7 @@ import { ChoiceResponse, ShowVoteChoiceResponse } from "../dist/responses/show-v
 import { GetVoterResponse, CreateVoterResponse, CastVoteResponse } from "../dist/responses/voter.js";
 import { cases, show, choice, voter } from "./responses.fixture.mjs";
 
-const specification = JSON.parse(await readFile(new URL("../../runner/openapi.json", import.meta.url), "utf8"));
+const specification = JSON.parse(await readFile(new URL("../../../../../runner/openapi.json", import.meta.url), "utf8"));
 const endpoints = [
   ["getShowVote", ShowVoteResponse, "ShowVoteResponse"],
   ["getShowVoteChoice", ShowVoteChoiceResponse, "ShowVoteChoiceResponse"],
