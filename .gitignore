@@ -7,8 +7,7 @@ supabase/.temp/
 supabase/.branches/
 supabase/functions/_shared/sdk/dist/
 *.tsbuildinfo
-test-support/.npmrc
-frontend/.npmrc
+.npmrc
 frontend/dist/
 frontend/.expo/
 frontend/android/
