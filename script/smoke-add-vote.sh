@@ -5,7 +5,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/smoke-config.sh"
 
 # Local configuration: edit the defaults after :- below; no export is needed.
 SHOW_VOTE_UUID="${SHOW_VOTE_UUID:-11111111-1111-4111-8111-111111111101}"
-USER_REF="${USER_REF:-N_35c4251d9ca734b136a4}" # Paste the N_ token returned by smoke-smartuser-token.sh.
+USER_REF="${USER_REF:-}" # Optional absolute reference for direct DVLive credit.
 NB_POINTS="${NB_POINTS:-100}"
 ADDITIONAL_VOTE_TYPE="${ADDITIONAL_VOTE_TYPE:-VIDEO}"
 EXPECTED_STATUS="${EXPECTED_STATUS:-201}"
@@ -24,7 +24,9 @@ case "$DVLIVE_ENV" in
 esac
 [[ -n "$DVLIVE_BEARER_TOKEN" ]] || { echo 'FAIL: configure DVLIVE_BEARER_TOKEN in script/config.json' >&2; exit 1; }
 [[ -n "$SHOW_VOTE_UUID" ]] || { echo 'FAIL: SHOW_VOTE_UUID required' >&2; exit 1; }
-[[ "$USER_REF" == N_* ]] || { echo 'FAIL: paste the SmartUser N_ token into USER_REF in this smoke test.' >&2; exit 1; }
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/smoke-auth-common.sh"
+if [[ -z "$USER_REF" ]]; then sync_supabase_session; fi
+[[ ! "$USER_REF" =~ ^[NAU]_ ]] || { echo 'FAIL: use an absolute reference, not a SmartUser token.' >&2; exit 1; }
 case "$ADDITIONAL_VOTE_TYPE" in
   PURCHASE|SPONSOR|VIDEO|GAME|REFERAL|PROMO) ;;
   *) echo 'FAIL: invalid ADDITIONAL_VOTE_TYPE' >&2; exit 1 ;;

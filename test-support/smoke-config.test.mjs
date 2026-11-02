@@ -53,12 +53,12 @@ open(a[a.index('--output')+1],'w').write(json.dumps(data))
 print('201' if post else '200',end='')
 `, { mode: 0o755 });
   for (const name of ['smoke-get-show-vote.sh', 'smoke-add-vote.sh']) {
-    const result = spawnSync('bash', [name], { cwd: join(root, 'script'), env: { ...f.environment, USER_REF: 'N_manual-token' }, encoding: 'utf8' });
+    const result = spawnSync('bash', [name], { cwd: join(root, 'script'), env: { ...f.environment, USER_REF: 'absolute-user' }, encoding: 'utf8' });
     assert.equal(result.status, 0, result.stderr);
     const args = JSON.parse(readFileSync(f.environment.CAPTURE, 'utf8'));
     if (name.includes('add-vote')) {
       assert.ok(args.includes('Authorization: Bearer test-bearer'));
-      assert.match(args.at(-1), /show-vote\/json-show%2Fa\/voter\/N_manual-token\/add-vote$/);
+      assert.match(args.at(-1), /show-vote\/json-show%2Fa\/voter\/absolute-user\/add-vote$/);
       assert.ok(!args.includes('apikey: test-key'));
     } else {
       assert.ok(args.includes('bearer-token: test-bearer'));

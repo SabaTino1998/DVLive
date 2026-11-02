@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getSmartUserToken } from './smartuser.mjs';
+import { getSmartUserToken, getSmartUserAppSession } from './smartuser.mjs';
 
 const config = {
   applicationId: 'smartuser.test', applicationSecret: 'test-secret', env: 'STAG',
@@ -66,14 +66,14 @@ test('failed login never returns the setup token and cleans up', async () => {
   assert.deepEqual(fake.calls.at(-1), ['reset']);
 });
 
-test('signup creates email identity after setup, then logs in before returning token', async () => {
+test('signup uses the signup session without a second login', async () => {
   const fake = sdk();
   const signup = { ...config, signup: true, username: 'new@example.test' };
   assert.equal(await getSmartUserToken(signup, fake.load), 'N_test-session');
-  assert.deepEqual(fake.calls.slice(0, 4), [
+  assert.deepEqual(fake.calls.slice(0, 3), [
     ['setup', config.applicationSecret, { env: 'STAG' }],
     ['signup', signup.username, config.password],
-    ['login', signup.username, config.password], ['getToken'],
+    ['getToken'],
   ]);
 });
 
@@ -83,4 +83,16 @@ test('signup failure stops before login and cleans up; non-email username is rej
   assert.equal(fake.calls.some(([action]) => action === 'login' || action === 'getToken'), false);
   assert.deepEqual(fake.calls.at(-1), ['reset']);
   await assert.rejects(getSmartUserToken({ ...config, signup: true }, () => assert.fail('SDK must not load')), /email address/);
+});
+
+test('smoke session exchanges N for the same syncUser JWT used by the frontend', async () => {
+  const fake = sdk();
+  const data = { access_token: 'app.jwt.test', expires_in: 1500, absolute_reference: 'user', user_id: 'user' };
+  const result = await getSmartUserAppSession({ ...config, supabaseUrl: 'http://edge.test', supabaseKey: 'anon-key' }, fake.load, async (url, options) => {
+    assert.equal(url, 'http://edge.test/functions/v1/bolt-auth-proxy');
+    assert.deepEqual(JSON.parse(options.body), { command: 'syncUser', service_slug: 'dvlive', userToken: 'N_test-session' });
+    assert.equal(options.headers.apikey, 'anon-key');
+    return Response.json({ ok: true, data });
+  });
+  assert.deepEqual(result, data);
 });

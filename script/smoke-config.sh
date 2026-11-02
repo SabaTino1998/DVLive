@@ -11,7 +11,7 @@ smoke_load_config() {
   local key value
   # Only recognized names may become shell variables.
   for key in EXPO_PUBLIC_SMARTUSER_APP_ID EXPO_PUBLIC_SMARTUSER_SECRET EXPO_PUBLIC_SMARTUSER_ENV \
-    SMART_USER_USERNAME SMART_USER_PASSWORD DVLIVE_BEARER_TOKEN SHOW_VOTE_UUID \
+    EXPO_PUBLIC_SERVICE_SLUG SMART_USER_USERNAME SMART_USER_PASSWORD DVLIVE_BEARER_TOKEN SHOW_VOTE_UUID \
     SUPABASE_URL SUPABASE_ANON_KEY DVLIVE_ENV; do
     if jq -e --arg key "$key" 'has($key)' "$SMOKE_CONFIG_FILE" >/dev/null; then
       # Sentinel preserves any trailing newlines in a configured value.

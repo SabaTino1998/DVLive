@@ -16,6 +16,7 @@
   "dependencies": {
     "@digitalvirgo/su-bolt-react": "2.6.0",
     "@react-native-async-storage/async-storage": "2.2.0",
+    "@supabase/supabase-js": "2.49.1",
     "crypto-js": "4.2.0",
     "expo": "~54.0.10",
     "expo-constants": "~18.0.9",

@@ -22,26 +22,16 @@ logic reusable across projects rather than implementing it in the Edge Function.
 
 ## SDK dependency
 
-The target integration consumes the published npm package, independently of
-where its source repository is checked out. Import the SDK as
-`@digitalvirgo/dvlive-api` and map that name in `functions/dvlive/deno.json` to a
-verified, published, pinned `npm:@digitalvirgo/dvlive-api@<published-version>`.
-Replace the version placeholder with an actual published version. A version in
-a local SDK `package.json` does not establish npm availability.
+Explicit user instruction: the DVLive SDK has no published npm version.
+Preserve the existing local mapping `../_shared/sdk/src/index.ts` and the
+public import `@digitalvirgo/dvlive-api`. Do not modify the SDK for auth changes.
 
-Keep a `.npmrc` alongside the function entrypoint at
-`functions/dvlive/.npmrc`. Configure the `@digitalvirgo` scope to use the
-organization's actual package registry. If that registry requires authentication,
-reference credentials through environment variables rather than putting token
-values in the file. Make registry credentials available to the processes that
-resolve dependencies during local serving and deployment; these credentials are
-separate from the caller's DV Live bearer token and Supabase authentication.
-
-Do not use an absolute filesystem path, a relative path into an SDK source
-checkout, a symlink, or a local `dist/` directory as the npm integration's
-dependency. Application imports must stay unchanged when updating the package
-version. Verify registry resolution and function bundling with the pinned
-version and the function's `.npmrc` configuration.
+The user requires `bolt-auth-proxy/index.ts`, its `deno.json`, and
+`_shared/resolve-product.ts` to stay identical to the Bravigo source.
+Use its actual `syncUser` flow, including profile/product synchronization and
+its existing JWT/GoTrue mode selection; do not replace it with a simplified proxy.
+Its `.npmrc` references `NPM_TOKEN`. Real credentials go only in ignored `.env` files.
+The local service slug is `dvlive`, so server credentials use `DVLIVE_SMART_USER_`.
 
 ## Environment and authentication
 
@@ -67,8 +57,12 @@ to the request; concurrent requests must not share credentials. Do not store the
 DV Live token in the server environment or log it.
 
 Supabase gateway authentication is separate from DV Live authentication.
-`verify_jwt` is currently `false` in `config.toml`; do not use the caller's
-Supabase `Authorization` header as the DV Live token.
+`verify_jwt` is false for both functions. For voter modes, `Authorization`
+carries the app user JWT and is verified directly in dvlive/index.ts using
+Bravigo's importJwtKey/normalizeAppClaims logic and djwt@3.0.2. Use verified sub
+for getVoter/castVote userRef and createVoter uniqRef. Caller references cannot
+override that identity. The DVLive API token remains in bearer-token.
+Show/choice modes keep existing behavior; the catalog needs no JWT or configuration.
 
 ## SDK logging
 
@@ -156,7 +150,8 @@ api.castVote({ showVoteUuid, userRef }, body);
 ```
 
 For HTTP POST input, keep parsed JSON typed as `unknown` and pass it as the
-second argument. These overloads validate raw data inside the SDK; do not cast
+second argument. For createVoter only, inject JWT sub as uniqRef into object
+bodies; leave non-object bodies to SDK validation. These overloads validate raw data inside the SDK; do not cast
 it to a typed input, spread it into route values, or duplicate body validation
 in the function. Keep the service call inside the handler's error boundary and
 await it; invalid input rejects with `ApiValidationError`.
@@ -218,7 +213,7 @@ for consuming the npm package. With Supabase CLI and Docker available:
 
 ```sh
 supabase start
-supabase functions serve dvlive --env-file supabase/.env
+supabase functions serve --env-file supabase/.env
 ```
 
 Verify integration behavior by running the relevant smoke script separately

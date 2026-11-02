@@ -30,7 +30,7 @@ Con Supabase locale, dalla root del repository:
 
 ```bash
 supabase start
-supabase functions serve dvlive --env-file supabase/.env
+supabase functions serve --env-file supabase/.env
 ```
 
 Su un dispositivo fisico, `SUPABASE_URL` deve usare l’IP LAN del Mac,
@@ -45,14 +45,21 @@ compatibile se la versione installata di Expo Go supporta solo SDK più recenti.
 - `SmartUserProvider`: inizializzazione e aggiornamento tramite gli eventi SDK.
 - `AuthProvider`: login email/password e signup email/password nel client, con ripristino
   della sessione gestito da SmartUser. Nessuna copia del token in cookie o storage custom.
-- Signup: `signupWithEmail → createVoter → getVoter`, poi saldo e `getShowVote`.
+- Signup: `signupWithEmail → syncSupabaseSession → createVoter → getVoter`, poi saldo e `getShowVote`.
   Come Bravigo, il signup fornisce già il token: non viene eseguito un secondo login.
-- Login: `loginWithEmail → getVoter` e `getShowVote`.
+- Login: `loginWithEmail → syncSupabaseSession → getVoter` e `getShowVote`.
 - Dettaglio: Expo Router apre `/choices/[uuid]` ed esegue `getShowVoteChoice`.
 - `PRESENT` viene visualizzato come **PRESENT**, `EVICTED` come **EVICTED**.
 
 Tutte le chiamate DV Live passano direttamente dalla Edge Function Supabase.
-`userRef`/`uniqRef` usano sempre il token `N_…` corrente dell’SDK.
+`resolveUser.ts` e `supabase.ts` sono quelli originali di Bravigo: `syncUser`
+restituisce il JWT applicativo, persistito con scadenza tramite `setAppToken`.
+Il client DVLive invia quel JWT in `Authorization`; la edge ricava `userRef` e
+`uniqRef` dal claim `sub`. Non vengono inviati riferimenti utente dal client.
+Alla scadenza, o dopo un 401, il client rinnova il JWT con `syncSupabaseSession`.
+`EXPO_PUBLIC_SERVICE_SLUG=dvlive` seleziona servizio e credenziali backend.
+Signup salva lo stato di registrazione voter pendente prima di `syncUser`, per
+consentire un nuovo tentativo senza ricreare l’account SmartUser.
 Un voter non trovato dopo un nuovo login resta un errore esplicito: l’app non crea
 automaticamente un altro voter né sostituisce il token con un’identità diversa.
 Se `createVoter` fallisce dopo il signup, la home permette di riprovare solo quella

@@ -2,7 +2,7 @@
 
 - `supabase/functions/_shared/sdk/`: TypeScript package `@digitalvirgo/dvlive-api`, with typed responses and HTTP metadata.
 - `runner/`: original Node.js runner, client, configuration, and OpenAPI specification.
-- `supabase/`: single **DVLive** Edge Function and backend configuration.
+- `supabase/`: **DVLive** Edge Function, original Bravigo auth proxy and backend configuration.
 - `script/`: individual smoke tests; `add-vote` calls DV Live directly, other voting operations use Supabase.
 
 ## App Expo (React Native)
@@ -52,9 +52,9 @@ Mapped SDK response data and the original DV Live HTTP status codes are returned
 | --- | --- | --- | --- | --- |
 | `getShowVoteChoice` | GET | `uuid` | — | Participant, status, images, rounds |
 | `getShowVote` | GET | `uuid` | — | Show, dates, and current round with participants |
-| `getVoter` | GET | `showVoteUuid`, `userRef` | — | Voter, balance, fraud status |
-| `createVoter` | POST | `showVoteUuid` | Optional `email`, `phone`, `uniqRef` | Registration result |
-| `castVote` | POST | `showVoteUuid`, `userRef` | Required `votes`, optional fraud prevention fields | Voting result and remaining votes, when provided |
+| `getVoter` | GET | `showVoteUuid` | — | Voter, balance, fraud status |
+| `createVoter` | POST | `showVoteUuid` | Optional `email`, `phone` | Registration result |
+| `castVote` | POST | `showVoteUuid` | Required `votes`, optional fraud prevention fields | Voting result and remaining votes, when provided |
 
 `votes` is a non-empty array of `{ "choiceUuid": "...", "nbVotes": 1 }`.
 The fraud prevention fields are `sessionToken`, `phoneFingerPrint`, `ip`, `userAgent`,
@@ -66,12 +66,55 @@ curl 'http://127.0.0.1:54321/functions/v1/dvlive?mode=getShowVote&uuid=SHOW_UUID
   -H "Authorization: Bearer $SUPABASE_JWT" \
   -H "bearer-token: $DVLIVE_BEARER_TOKEN"
 
-curl 'http://127.0.0.1:54321/functions/v1/dvlive?mode=castVote&showVoteUuid=SHOW_UUID&userRef=VOTER_REF' \
+curl 'http://127.0.0.1:54321/functions/v1/dvlive?mode=castVote&showVoteUuid=SHOW_UUID' \
   -H "Authorization: Bearer $SUPABASE_JWT" \
   -H "bearer-token: $DVLIVE_BEARER_TOKEN" \
   -H 'Content-Type: application/json' \
   --data '{"votes":[{"choiceUuid":"CHOICE_UUID","nbVotes":1}]}'
 ```
+
+### Bravigo authentication
+
+`supabase/functions/bolt-auth-proxy/index.ts`, its `deno.json` and
+`_shared/resolve-product.ts` are copied unchanged from Bravigo. The frontend
+`resolveUser.ts`, `supabase.ts`, `traceFetch.ts` and `logger.ts` are also copied
+unchanged; `appConfig.ts` adapts the existing local Expo configuration.
+
+The flow is `SmartUser login/signup → N token → syncUser → app JWT → DVLive`.
+The local service slug is `dvlive`: the proxy selects `DVLIVE_SMART_USER_APP_ID`
+and `DVLIVE_SMART_USER_APP_SECRET` from `supabase/.env`, plus `SMART_USER_APP_ENV`.
+Frontend SmartUser credentials remain separate, in `frontend/.env`.
+Real secrets belong in the ignored `.env` files, never `.env.example`.
+The proxy `.npmrc` references `NPM_TOKEN` from the server environment.
+
+As in Bravigo, a configured `APP_JWT_SECRET` (fallback `SUPABASE_JWT_SECRET`)
+selects the custom HS256 JWT path. Without either key, the original proxy uses
+Supabase Auth to create/reuse the local user and return a GoTrue access token.
+Supabase injects its server credentials locally; both issuer and DVLive verifier
+must have the same signing key. No `jwt.ts` helper is used.
+
+For `getVoter`, `createVoter` and `castVote`, send the app JWT in `Authorization`.
+`dvlive/index.ts` verifies it with the same `djwt@3.0.2` library/key selection and
+claim normalization used by Bravigo's `avatar-generate`. The verified `sub`
+provides `userRef`/`uniqRef`; caller-supplied values cannot override the identity.
+The API credential stays separate in `bearer-token` and is forwarded to DVLive.
+The SDK catalog still describes SDK parameters; user identity is filled by the adapter.
+
+The single migration `20261102000300_dvlive_auth.sql` installs the three auth
+tables from the Bravigo baseline and seeds the local service directly as `dvlive`.
+It preserves the Bravigo service/product IDs. This is the auth schema subset,
+not the entire Bravigo backoffice database.
+
+```sh
+supabase migration up --local
+supabase functions serve --env-file supabase/.env
+```
+
+Restart the function server and Expo after changing their `.env` files.
+To move DVLive to Bravigo, copy `functions/dvlive` and the local SDK at the same
+relative path; enable `functions.dvlive` with `verify_jwt = false`, configure
+`DVLIVE_ENV`, and use Bravigo's existing proxy, schema and app JWT. Do not apply
+the local DVLive bootstrap migration to an existing Bravigo database.
 
 ### Local environment and deployment
 
@@ -105,7 +148,7 @@ With the Supabase CLI and Docker available, run from the repository root:
 
 ```sh
 supabase start
-supabase functions serve dvlive --env-file supabase/.env
+supabase functions serve --env-file supabase/.env
 ```
 
 To deploy to your project:

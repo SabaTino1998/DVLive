@@ -3,8 +3,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authenticate } from '../lib/authFlow';
 import { getApplicationId, getSmartUser, setupSmartUser } from '../lib/smartUser';
 import { useSmartUser } from './SmartUserContext';
+import { syncSupabaseSession } from '../lib/resolveUser';
+import { clearAppToken } from '../lib/supabase';
 
-export interface Session { email: string; userToken: string; needsRegistration: boolean }
+export interface Session { email: string; userToken: string; absoluteReference: string; needsRegistration: boolean }
 interface Auth {
   session: Session | null; restoring: boolean; busy: boolean;
   signIn: (email: string, password: string) => Promise<void>;
@@ -22,14 +24,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!smartUser.ready) return;
     if (manual.current) { setRestoring(false); return; }
-    if (!smartUser.isLogged || !smartUser.userToken?.startsWith('N_')) { setSession(null); setRestoring(false); return; }
+    if (!smartUser.isLogged || !smartUser.userToken?.startsWith('N_')) { void clearAppToken(); setSession(null); setRestoring(false); return; }
     let current = true;
     const token = smartUser.userToken;
-    AsyncStorage.getItem(metadataKey()).then(raw => {
+    setRestoring(true);
+    Promise.all([AsyncStorage.getItem(metadataKey()), syncSupabaseSession(token)]).then(([raw, synced]) => {
       let metadata: { email?: string; needsRegistration?: boolean } = {};
       try { metadata = raw ? JSON.parse(raw) : {}; } catch { /* Recover without optional metadata. */ }
-      if (current) setSession(previous => previous?.userToken === token ? previous : { email: metadata.email || '', userToken: token, needsRegistration: metadata.needsRegistration === true });
-    }).catch(() => { if (current) setSession({ email: '', userToken: token, needsRegistration: false }); }).finally(() => { if (current) setRestoring(false); });
+      if (current) setSession(previous => previous?.userToken === token ? previous : { email: metadata.email || '', userToken: token, absoluteReference: synced.absolute_reference, needsRegistration: metadata.needsRegistration === true });
+    }).catch(() => { if (current) setSession(null); }).finally(() => { if (current) setRestoring(false); });
     return () => { current = false; };
   }, [smartUser.ready, smartUser.isLogged, smartUser.userToken]);
 
@@ -39,13 +42,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const sdk = await setupSmartUser();
       const value = await authenticate(sdk, signup, email.trim(), password);
-      // Store only UI metadata; SmartUser owns all token persistence and refresh.
-      await AsyncStorage.setItem(metadataKey(), JSON.stringify({ email: value.email, needsRegistration: value.needsRegistration }));
-      setSession(value);
+      let needsRegistration = value.needsRegistration;
+      const raw = await AsyncStorage.getItem(metadataKey());
+      try {
+        const previous = raw ? JSON.parse(raw) : null;
+        needsRegistration ||= previous?.email?.toLowerCase() === value.email.toLowerCase() && previous?.needsRegistration === true;
+      } catch { /* Optional metadata. */ }
+      // Signup has succeeded: preserve this flag even if syncUser needs retrying.
+      await AsyncStorage.setItem(metadataKey(), JSON.stringify({ email: value.email, needsRegistration }));
+      const synced = await syncSupabaseSession(value.userToken);
+      setSession({ ...value, absoluteReference: synced.absolute_reference, needsRegistration });
     } finally { manual.current = false; setBusy(false); await smartUser.refresh(); }
   }, [smartUser.refresh]);
   const signOut = useCallback(async () => {
     manual.current = true; setBusy(true);
+    await clearAppToken(); setSession(null);
     try { await getSmartUser().logout(); await AsyncStorage.removeItem(metadataKey()); setSession(null); }
     finally { manual.current = false; setBusy(false); await smartUser.refresh(); }
   }, [smartUser.refresh]);

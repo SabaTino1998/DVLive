@@ -24,6 +24,48 @@ class InputError extends Error {
   }
 }
 
+async function importJwtKey(env: HandlerOptions["env"]): Promise<CryptoKey> {
+  const secret = env("APP_JWT_SECRET") ?? env("SUPABASE_JWT_SECRET");
+  if (!secret) throw new Error("JWT secret not configured");
+  return await crypto.subtle.importKey("raw", new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
+}
+
+interface NormalizedAppClaims {
+  sub: string;
+  app_role: string;
+  service_id: string | null;
+  product_id: string | null;
+}
+
+// Same normalization as Bravigo's avatar-generate/index.ts.
+function normalizeAppClaims(raw: Record<string, unknown>): NormalizedAppClaims | null {
+  const meta = raw.app_metadata && typeof raw.app_metadata === "object"
+    ? raw.app_metadata as Record<string, unknown> : {};
+  const sub = typeof raw.sub === "string" ? raw.sub : "";
+  const app_role = String(raw.app_role ?? meta.app_role ?? "");
+  const service_id = String(raw.service_id ?? meta.service_id ?? "") || null;
+  const product_id = String(raw.product_id ?? meta.product_id ?? "") || null;
+  if (!sub || app_role !== "app_user") return null;
+  return { sub, app_role, service_id, product_id };
+}
+
+async function requireUser(req: Request, env: HandlerOptions["env"]): Promise<string> {
+  const auth = req.headers.get("Authorization") ?? "";
+  if (!auth.toLowerCase().startsWith("bearer ")) throw new InputError("Missing bearer token.", 401);
+  let verified: Record<string, unknown>;
+  try {
+    const key = await importJwtKey(env);
+    const { verify: jwtVerify } = await import("jsr:@zaubrik/djwt@3.0.2");
+    verified = await jwtVerify(auth.slice(7).trim(), key);
+  } catch {
+    throw new InputError("Invalid token.", 401);
+  }
+  const claims = normalizeAppClaims(verified);
+  if (!claims) throw new InputError("Not an app_user token.", 403);
+  return claims.sub;
+}
+
 function json(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -53,17 +95,17 @@ async function parseRequest(req: Request, action: ApiModeDefinition, mode: ApiMo
   return body;
 }
 
-function callApi(api: ApiService, mode: ApiModes, query: URLSearchParams, body?: unknown): Promise<ApiResponse<ApiResult>> {
+function callApi(api: ApiService, mode: ApiModes, query: URLSearchParams, body?: unknown, userRef = ""): Promise<ApiResponse<ApiResult>> {
   const uuid = query.get("uuid") ?? "";
   const showVoteUuid = query.get("showVoteUuid") ?? "";
-  const userRef = query.get("userRef") ?? "";
 
   // SDK methods validate parameters and the JSON body before making an HTTP request.
   switch (mode) {
     case ApiModes.GetShowVote: return api.getShowVote(uuid);
     case ApiModes.GetShowVoteChoice: return api.getShowVoteChoice(uuid);
     case ApiModes.GetVoter: return api.getVoter({ showVoteUuid, userRef });
-    case ApiModes.CreateVoter: return api.createVoter({ showVoteUuid }, body);
+    case ApiModes.CreateVoter: return api.createVoter({ showVoteUuid },
+      body && typeof body === "object" && !Array.isArray(body) ? { ...body, uniqRef: userRef } : body);
     case ApiModes.CastVote: return api.castVote({ showVoteUuid, userRef }, body);
     default: {
       const unsupported: ApiModes = mode;
@@ -86,6 +128,8 @@ export function createHandler({ env }: HandlerOptions) {
       const body = await parseRequest(req, action, mode);
       const token = req.headers.get("bearer-token")?.trim();
       if (!token) throw new InputError("The bearer-token header is required (DV Live token without the Bearer prefix).", 401);
+      const needsUser = mode === ApiModes.GetVoter || mode === ApiModes.CreateVoter || mode === ApiModes.CastVote;
+      const userRef = needsUser ? await requireUser(req, env) : "";
       let api: ApiService;
       try {
         api = new ApiService({
@@ -97,7 +141,7 @@ export function createHandler({ env }: HandlerOptions) {
       } catch {
         return error(500, "Invalid DVLive SDK configuration.");
       }
-      const result = await callApi(api, mode, url.searchParams, body);
+      const result = await callApi(api, mode, url.searchParams, body, userRef);
       return json(result.data, result.status);
     } catch (err) {
       if (err instanceof InputError) return error(err.status, err.message, err.headers);

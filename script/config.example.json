@@ -2,6 +2,7 @@
   "EXPO_PUBLIC_SMARTUSER_APP_ID": "test.bolt.app",
   "EXPO_PUBLIC_SMARTUSER_SECRET": "<smartuser-secret>",
   "EXPO_PUBLIC_SMARTUSER_ENV": "STAG",
+  "EXPO_PUBLIC_SERVICE_SLUG": "dvlive",
   "SMART_USER_USERNAME": "<test-user-email>",
   "SMART_USER_PASSWORD": "<test-user-password>",
   "DVLIVE_BEARER_TOKEN": "<dvlive-bearer-token>",

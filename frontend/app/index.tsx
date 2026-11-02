@@ -13,7 +13,7 @@ function HomeContent() {
   const [show, setShow] = useState<Show | null>(null); const [voter, setVoter] = useState<Voter | null>(null);
   const [busy, setBusy] = useState(true); const [error, setError] = useState(''); const [showError, setShowError] = useState('');
   const [attempt, setAttempt] = useState(0); const [search, setSearch] = useState(''); const [filter, setFilter] = useState('ALL');
-  const token = auth.session?.userToken;
+  const token = auth.session?.absoluteReference;
   useEffect(() => {
     if (!token) return;
     let current = true;

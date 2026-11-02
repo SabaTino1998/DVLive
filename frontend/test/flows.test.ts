@@ -23,22 +23,22 @@ test('login uses loginWithEmail and never creates a new account', async () => {
   assert.equal((await authenticate(fake.client, false, 'test@example.test', 'password')).needsRegistration, false);
   assert.deepEqual(fake.calls, [['login', 'test@example.test', 'password'], ['token']]);
 });
-test('voter requests use the current SmartUser N token and correct Supabase headers', async () => {
-  let token = 'N_first'; const calls: { url: URL; options?: RequestInit }[] = [];
+test('voter requests use the app JWT and omit caller-controlled references', async () => {
+  let token = 'jwt-first'; const calls: { url: URL; options?: RequestInit }[] = [];
   const send: typeof fetch = async (input, options) => {
     calls.push({ url: new URL(String(input)), options });
     return Response.json({ status: 'success' });
   };
   const client = createDvLiveClient(config, () => token, send);
   await client.createVoter('test@example.test');
-  token = 'N_second/with|characters';
+  token = 'jwt-second';
   await client.voter();
   assert.equal(calls[0].url.searchParams.get('mode'), 'createVoter');
-  assert.deepEqual(JSON.parse(calls[0].options!.body as string), { uniqRef: 'N_first', email: 'test@example.test' });
-  assert.equal(calls[1].url.searchParams.get('userRef'), token);
+  assert.deepEqual(JSON.parse(calls[0].options!.body as string), { email: 'test@example.test' });
+  assert.equal(calls[1].url.searchParams.get('userRef'), null);
   assert.equal(calls[1].url.searchParams.get('showVoteUuid'), 'show');
   assert.equal(new Headers(calls[1].options!.headers).get('bearer-token'), config.bearer);
-  assert.equal(new Headers(calls[1].options!.headers).get('Authorization'), `Bearer ${config.key}`);
+  assert.equal(new Headers(calls[1].options!.headers).get('Authorization'), `Bearer ${token}`);
   assert.equal(new Headers(calls[1].options!.headers).get('apikey'), config.key);
 });
 test('show and detail map to the existing Edge Function modes', async () => {
@@ -66,9 +66,18 @@ test('failed voter registration can be retried', async () => {
   await assert.rejects(registerSignupVoter('N_retry', async () => { throw new Error('offline'); }), /offline/);
   await registerSignupVoter('N_retry', async () => {});
 });
-test('anonymous or autologin tokens cannot be used as voter references', async () => {
-  for (const token of ['', 'A_anonymous', 'U_autologin']) {
-    const client = createDvLiveClient(config, () => token, () => { throw new Error('Unexpected request'); });
-    assert.throws(() => client.voter(), /Sign in with SmartUser/);
-  }
+test('voter request fails when no user JWT is available', async () => {
+  const client = createDvLiveClient(config, async () => { throw new Error('No app session'); }, () => { throw new Error('Unexpected request'); });
+  await assert.rejects(client.voter(), /No app session/);
+});
+test('a 401 renews the JWT once and retries with the refreshed token', async () => {
+  const headers: string[] = [];
+  const forces: (boolean | undefined)[] = [];
+  const client = createDvLiveClient(config, force => { forces.push(force); return force ? 'fresh' : 'old'; }, async (_url, options) => {
+    headers.push(new Headers(options!.headers).get('Authorization')!);
+    return headers.length === 1 ? Response.json({ message: 'Expired' }, { status: 401 }) : Response.json({});
+  });
+  await client.voter();
+  assert.deepEqual(headers, ['Bearer old', 'Bearer fresh']);
+  assert.deepEqual(forces, [undefined, true]);
 });
