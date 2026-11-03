@@ -19,10 +19,9 @@ npm run web
 Expo carica `frontend/.env` automaticamente. Il sito è normalmente su
 `http://localhost:8081`. La vecchia applicazione Vite/Express è stata sostituita.
 Setup e flussi sono descritti in [frontend/README.md](frontend/README.md).
-Il client Expo usa il nuovo contratto BBM (JWT su tutti i comandi, envelope
-`{ ok, data }`, token DV Live nei secret del backend). Richiede la funzione del
-pack `packs/bbm`; la funzione e gli smoke script locali descritti sotto
-sono allineati allo stesso contratto.
+Il client Expo usa il nuovo contratto API (JWT su tutti i comandi, envelope
+`{ ok, data }`, token DV Live nei secret del backend). La Edge Function e gli
+smoke script locali descritti sotto sono allineati allo stesso contratto.
 
 ## Runner
 
@@ -190,7 +189,7 @@ const result = await api.getShowVote(uuid);
 return json({ ok: true, data: result.data }, result.status);
 ```
 
-The SDK wrapper remains internal; the adapter wraps mapped `result.data` in the BBM envelope.
+The SDK wrapper remains internal; the adapter wraps mapped `result.data` in the API response envelope.
 The SDK decodes DV Live responses in `supabase/functions/_shared/sdk/src/responses/`, then converts them
 into public model instances through their static `fromResponse()` factories in
 `supabase/functions/_shared/sdk/src/models/`. Customize output fields and transformations in those factories;
