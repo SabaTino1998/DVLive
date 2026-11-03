@@ -11,7 +11,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     dvlive: {
       url: process.env.SUPABASE_URL || '',
       key: process.env.SUPABASE_ANON_KEY || '',
-      bearer: process.env.DVLIVE_BEARER_TOKEN || '',
       showUuid: process.env.SHOW_VOTE_UUID || '',
     },
   },

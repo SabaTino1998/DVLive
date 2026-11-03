@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import ts from '../supabase/functions/_shared/sdk/node_modules/typescript/lib/typescript.js';
+import ts from '../supabase/functions/_shared/dvlive-sdk/node_modules/typescript/lib/typescript.js';
 
 const moduleUrl = source => `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`;
 const logger = moduleUrl('export function createLogger(){return {debug(){},error(){}}}');

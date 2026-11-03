@@ -14,7 +14,7 @@
     "@jsr/zaubrik__djwt": "3.0.2"
   },
   "scripts": {
-    "check": "node ../supabase/functions/_shared/sdk/node_modules/typescript/bin/tsc -p tsconfig.edge.json",
-    "test": "npm --prefix ../supabase/functions/_shared/sdk run build && node --test *.test.mjs"
+    "check": "node ../supabase/functions/_shared/dvlive-sdk/node_modules/typescript/bin/tsc -p tsconfig.edge.json",
+    "test": "npm --prefix ../supabase/functions/_shared/dvlive-sdk run build && node --test *.test.mjs"
   }
 }

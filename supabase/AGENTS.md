@@ -50,19 +50,22 @@ The SDK validates supported values and selects the upstream URL. Do not import
 or expose `ApiEnvironment`, duplicate environment checks, or define upstream
 URLs in the function. Invalid SDK configuration returns HTTP 500.
 
-Read the DV Live token from the caller's `bearer-token` header, without a
-`Bearer` prefix. Trim it and return HTTP 401 if it is absent or blank. Supply it
-to the SDK as upstream `Authorization: Bearer <token>`. Keep token state local
-to the request; concurrent requests must not share credentials. Do not store the
-DV Live token in the server environment or log it.
+Read the fixed DV Live token from server secret `DVLIVE_API_TOKEN`, trim it,
+and return a 500 `CONFIGURATION_ERROR` when absent. Ignore caller `bearer-token`.
+Supply the secret as upstream `Authorization: Bearer <token>` and never log it.
 
 Supabase gateway authentication is separate from DV Live authentication.
-`verify_jwt` is false for both functions. For voter modes, `Authorization`
-carries the app user JWT and is verified directly in dvlive/index.ts using
-Bravigo's importJwtKey/normalizeAppClaims logic and djwt@3.0.2. Use verified sub
-for getVoter/castVote userRef and createVoter uniqRef. Caller references cannot
-override that identity. The DVLive API token remains in bearer-token.
-Show/choice modes keep existing behavior; the catalog needs no JWT or configuration.
+`verify_jwt` is false for both functions. All five commands require an app JWT
+in `Authorization`, verified with Bravigo's key selection and djwt@3.0.2.
+Keep `_shared/verify-app-jwt.ts` identical to Bravigo. It verifies HS256 tokens
+using APP_JWT_SECRET or SUPABASE_JWT_SECRET and requires a signing secret.
+It does not call GoTrue `/auth/v1/user` when both variables are absent.
+GoTrue tokens must use HS256 with the matching secret to pass this verifier.
+Require `app_role=app_user` and a nonempty `absolute_reference`, flat or in
+`app_metadata`. Use verified `absolute_reference` for voter `userRef`/`uniqRef`;
+`sub` is the profile UUID. Caller references cannot override identity.
+Missing/invalid JWT returns `AUTH_REQUIRED` (401); invalid app claims return
+`FORBIDDEN` (403). The catalog requires no JWT or configuration.
 
 ## SDK logging
 
@@ -123,8 +126,8 @@ Use `parseMode`, `ApiModes`, and `API_MODES` from the SDK. The enum is named
 catalog or duplicate its required-field definitions in the function.
 
 After handling OPTIONS, parse `mode` first. A missing, empty, or unrecognized
-mode returns the SDK catalog with HTTP 200 before reading the body, requiring a
-DV Live token, or constructing `ApiService`. This also applies to POST requests.
+mode returns the SDK catalog with HTTP 200 before reading the body, requiring an
+app JWT, or constructing `ApiService`. This also applies to POST requests.
 
 For a recognized mode, check the HTTP method against the SDK definition. Return
 405 with an `Allow` header on mismatch. POST requests require
@@ -150,7 +153,7 @@ api.castVote({ showVoteUuid, userRef }, body);
 ```
 
 For HTTP POST input, keep parsed JSON typed as `unknown` and pass it as the
-second argument. For createVoter only, inject JWT sub as uniqRef into object
+second argument. For createVoter only, inject verified absolute_reference as uniqRef into object
 bodies; leave non-object bodies to SDK validation. These overloads validate raw data inside the SDK; do not cast
 it to a typed input, spread it into route values, or duplicate body validation
 in the function. Keep the service call inside the handler's error boundary and
@@ -180,27 +183,23 @@ and transformations through constructors and static `fromResponse()` factories.
 There is no separate converters directory. `ApiResponse` only wraps `data`,
 `status`, and `headers`; it has no `fromResponse()` method.
 
-Return `json(result.data, result.status)`. Preserve the actual upstream success
-status, including a POST that returns 200 instead of 201. Do not expose the SDK
-wrapper or raw transport body text in successful public JSON. Change public data
-fields in SDK models, not through transformations in the Edge Function.
+Return `json({ ok: true, data: result.data }, result.status)`. Preserve actual
+upstream success status, including POST 200 instead of 201. Errors use
+`{ ok: false, error: { message, code, details } }`. Keep SDK models unchanged.
 
-Import error classes from the package root; their SDK source is `ApiErrors.ts`.
+Import error classes from the package root:
+- `ApiValidationError`: 400 `INVALID_REQUEST`.
+- SDK configuration errors: 500 `CONFIGURATION_ERROR`.
+- `ApiHttpError`: original HTTP status, `UPSTREAM_ERROR`, upstream JSON or text
+  in `error.details`.
+- `ApiRequestError`: 502 `UPSTREAM_NETWORK_ERROR` or 504 `UPSTREAM_TIMEOUT`.
+- `ApiResponseError`: 502 `UPSTREAM_RESPONSE_ERROR`.
+- Unexpected errors: 500 `INTERNAL_ERROR` with a generic message.
 
-| Error | Edge response |
-| --- | --- |
-| `ApiValidationError` | HTTP 400 with the SDK validation message |
-| SDK constructor/configuration error | HTTP 500 |
-| `ApiHttpError` | Original upstream status and JSON payload, or original text body and content type |
-| `ApiRequestError` with `kind === "network"` | HTTP 502 |
-| `ApiRequestError` with `kind === "timeout"` | HTTP 504 |
-| `ApiResponseError` | HTTP 502 |
-| Unexpected error | HTTP 500 with the existing generic message |
-
-Keep CORS headers on success and error responses. OPTIONS returns 204 and allows
-GET, POST, OPTIONS, and the existing request headers, including `bearer-token`.
-Do not forward upstream headers wholesale. `Retry-After` forwarding, CORS
-exposure, and automatic retries are not part of this integration.
+Keep CORS headers on all responses. OPTIONS returns 204 and allows GET, POST,
+OPTIONS and Content-Type, Authorization, X-Client-Info, Apikey. Never forward
+upstream headers wholesale. Authenticated adapter tests, including logging,
+run in `test-support`; SDK tests remain independent of app authentication.
 
 ## Local setup and verification
 

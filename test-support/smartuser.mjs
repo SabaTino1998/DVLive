@@ -74,7 +74,7 @@ export async function getSmartUserAppSession(config, loadSdk, send = fetch) {
   });
   const result = await response.json().catch(() => null);
   if (!response.ok || !result?.ok || !result.data?.access_token || !result.data.absolute_reference ||
-      result.data.user_id !== result.data.absolute_reference || typeof result.data.expires_in !== 'number' || result.data.expires_in <= 0) {
+      typeof result.data.user_id !== 'string' || !result.data.user_id || typeof result.data.expires_in !== 'number' || result.data.expires_in <= 0) {
     throw new Error(result?.error?.message || 'Invalid syncUser session.');
   }
   return result.data;

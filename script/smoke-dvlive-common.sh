@@ -6,7 +6,6 @@ set -euo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/smoke-config.sh"
 SUPABASE_URL="${SUPABASE_URL:-http://127.0.0.1:54321}"
 SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY:-}"
-DVLIVE_BEARER_TOKEN="${DVLIVE_BEARER_TOKEN:-}"
 # Leave SUPABASE_ANON_KEY empty for local auto-detection.
 
 case "${1:-}" in
@@ -43,9 +42,10 @@ dvlive_print_response() {
 # dvlive_request MODE METHOD QUERY_JSON [BODY_JSON] [EXPECTED_STATUS] [REQUIRE_TOKEN]
 dvlive_request() {
   local mode=$1 method=$2 params=$3 body=${4-} expected=${5:-200} require_token=${6:-true}
+  DVLIVE_ENVELOPED=false
   local authorization=$SUPABASE_ANON_KEY
   case "$mode" in
-    getVoter|createVoter|castVote) sync_supabase_session; authorization=$APP_JWT ;;
+    getShowVote|getShowVoteChoice|getVoter|createVoter|castVote) sync_supabase_session; authorization=$APP_JWT ;;
   esac
   local url=$FN key value
   local -a options=(--silent --show-error --connect-timeout 10 --max-time 60
@@ -54,10 +54,6 @@ dvlive_request() {
     --header "Authorization: Bearer $authorization"
     --header "apikey: $SUPABASE_ANON_KEY")
   if [[ -n "$mode" ]]; then
-    if [[ "$require_token" == true ]]; then
-      [[ -n "${DVLIVE_BEARER_TOKEN:-}" ]] || { echo 'FAIL: set DVLIVE_BEARER_TOKEN in script/config.json' >&2; exit 1; }
-      options+=(--header "bearer-token: $DVLIVE_BEARER_TOKEN")
-    fi
     url+="?mode=$(jq -rn --arg value "$mode" '$value | @uri')"
   fi
   while IFS= read -r key; do
@@ -81,10 +77,16 @@ dvlive_request() {
     exit 1
   fi
   dvlive_assert 'type == "object"' 'expected JSON object'
+  if [[ "$require_token" == true ]]; then
+    dvlive_assert '.ok == true and has("data")' 'expected BBM success envelope'
+    DVLIVE_ENVELOPED=true
+  fi
 }
 
 dvlive_assert() {
-  if ! jq -e "$1" "$TMP" >/dev/null; then
+  local expression=$1
+  if [[ "${DVLIVE_ENVELOPED:-false}" == true ]]; then expression=".data | ($expression)"; fi
+  if ! jq -e "$expression" "$TMP" >/dev/null; then
     dvlive_print_response >&2
     echo "FAIL: $2" >&2
     exit 1

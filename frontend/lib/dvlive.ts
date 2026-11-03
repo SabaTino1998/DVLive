@@ -8,7 +8,6 @@ const config = Constants.expoConfig?.extra?.dvlive as Partial<DvLiveConfig> | un
 export const dvlive = createDvLiveClient({
   url: config?.url || '',
   key: config?.key || '',
-  bearer: config?.bearer || '',
   showUuid: config?.showUuid || '',
 }, async force => {
   const sdk = getSmartUser();

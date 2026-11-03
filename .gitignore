@@ -7,7 +7,8 @@ supabase/.temp/
 supabase/.branches/
 supabase/functions/_shared/sdk/dist/
 *.tsbuildinfo
-.npmrc
+# Ignore npm registry configuration and credentials at every directory level.
+**/.npmrc
 frontend/dist/
 frontend/.expo/
 frontend/android/

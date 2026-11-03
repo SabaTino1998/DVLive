@@ -9,7 +9,7 @@
     "noEmit": true,
     "paths": {
       "@digitalvirgo/su-bolt-core": ["./node_modules/@digitalvirgo/su-bolt-core/dist/index.d.ts"],
-      "@digitalvirgo/dvlive-api": ["../supabase/functions/_shared/sdk/src/index.ts"],
+      "@digitalvirgo/dvlive-api": ["../supabase/functions/_shared/dvlive-sdk/src/index.ts"],
       "npm:@supabase/supabase-js@2.49.1": ["./node_modules/@supabase/supabase-js/dist/module/index.d.ts"],
       "jsr:@zaubrik/djwt@3.0.2": ["./node_modules/@jsr/zaubrik__djwt/_dist/mod.d.ts"]
     }

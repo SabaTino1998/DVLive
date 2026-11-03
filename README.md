@@ -19,6 +19,10 @@ npm run web
 Expo carica `frontend/.env` automaticamente. Il sito è normalmente su
 `http://localhost:8081`. La vecchia applicazione Vite/Express è stata sostituita.
 Setup e flussi sono descritti in [frontend/README.md](frontend/README.md).
+Il client Expo usa il nuovo contratto BBM (JWT su tutti i comandi, envelope
+`{ ok, data }`, token DV Live nei secret del backend). Richiede la funzione del
+pack `packs/bbm`; la funzione e gli smoke script locali descritti sotto
+sono allineati allo stesso contratto.
 
 ## Runner
 
@@ -36,17 +40,18 @@ See [runner/README.md](runner/README.md) for all available actions.
 Endpoint: `https://<project-ref>.supabase.co/functions/v1/dvlive`.
 Supabase JWT verification depends on `verify_jwt` in `supabase/config.toml`
 (currently `false`). Smoke tests still send the Supabase headers.
-Pass the DV Live token with each operation request in the
-`bearer-token: <token>` header (without the `Bearer` prefix), separately from the Supabase JWT.
-The function forwards it to the DV Live API as `Authorization: Bearer <token>`.
-It is not stored in the function's environment variables. The catalog does not require this header.
+Set `DVLIVE_API_TOKEN` in `supabase/.env` or Supabase secrets, without a
+`Bearer` prefix. The function attaches it to upstream requests. Clients send
+`apikey` and `Authorization: Bearer <app access_token>` for all five commands;
+never send `bearer-token`. The catalog requires no JWT or server configuration.
 
 The Edge Function uses the SDK's `parseMode` to convert the query parameter
 into the `ApiModes` enum. If `mode` is missing, empty, or unrecognized, it returns
 HTTP `200` with all modes, English descriptions, HTTP methods, required query
 parameters, JSON fields, and response types. The catalog comes directly
 from the SDK and does not require a DV Live token or environment configuration.
-Mapped SDK response data and the original DV Live HTTP status codes are returned without additional wrappers.
+Mapped SDK response data is returned as `{ "ok": true, "data": ... }`, preserving
+the original HTTP status. Errors use `{ "ok": false, "error": { "message", "code", "details" } }`.
 
 | mode | Method | Query parameters besides `mode` | JSON body | Response |
 | --- | --- | --- | --- | --- |
@@ -64,11 +69,11 @@ For POST requests, send `Content-Type: application/json`; query parameters do no
 ```sh
 curl 'http://127.0.0.1:54321/functions/v1/dvlive?mode=getShowVote&uuid=SHOW_UUID' \
   -H "Authorization: Bearer $SUPABASE_JWT" \
-  -H "bearer-token: $DVLIVE_BEARER_TOKEN"
+  -H "apikey: $SUPABASE_ANON_KEY"
 
 curl 'http://127.0.0.1:54321/functions/v1/dvlive?mode=castVote&showVoteUuid=SHOW_UUID' \
   -H "Authorization: Bearer $SUPABASE_JWT" \
-  -H "bearer-token: $DVLIVE_BEARER_TOKEN" \
+  -H "apikey: $SUPABASE_ANON_KEY" \
   -H 'Content-Type: application/json' \
   --data '{"votes":[{"choiceUuid":"CHOICE_UUID","nbVotes":1}]}'
 ```
@@ -90,20 +95,24 @@ The proxy `.npmrc` references `NPM_TOKEN` from the server environment.
 As in Bravigo, a configured `APP_JWT_SECRET` (fallback `SUPABASE_JWT_SECRET`)
 selects the custom HS256 JWT path. Without either key, the original proxy uses
 Supabase Auth to create/reuse the local user and return a GoTrue access token.
-Supabase injects its server credentials locally; both issuer and DVLive verifier
-must have the same signing key. No `jwt.ts` helper is used.
+DVLive uses the unchanged Bravigo `verify-app-jwt.ts`: it verifies HS256 tokens
+with `APP_JWT_SECRET`, falling back to `SUPABASE_JWT_SECRET`. This verifier
+requires a signing secret even when the proxy uses GoTrue; a GoTrue token must
+be HS256-signed with the matching secret. There is no `/auth/v1/user` fallback.
 
-For `getVoter`, `createVoter` and `castVote`, send the app JWT in `Authorization`.
-`dvlive/index.ts` verifies it with the same `djwt@3.0.2` library/key selection and
-claim normalization used by Bravigo's `avatar-generate`. The verified `sub`
-provides `userRef`/`uniqRef`; caller-supplied values cannot override the identity.
-The API credential stays separate in `bearer-token` and is forwarded to DVLive.
-The SDK catalog still describes SDK parameters; user identity is filled by the adapter.
+All commands require the app JWT in `Authorization`. `dvlive/index.ts` verifies
+its signature and requires `app_role=app_user` and `absolute_reference`, accepting
+flat claims or `app_metadata`. The verified `absolute_reference` supplies
+`userRef`/`uniqRef`; `sub` is the internal profile UUID. Caller references cannot
+override that identity. The SDK catalog describes SDK parameters; the adapter
+fills user identity. The auth proxy remains unchanged.
 
-The single migration `20261102000300_dvlive_auth.sql` installs the three auth
+The bootstrap migration `20261102000300_dvlive_auth.sql` installs the three auth
 tables from the Bravigo baseline and seeds the local service directly as `dvlive`.
 It preserves the Bravigo service/product IDs. This is the auth schema subset,
 not the entire Bravigo backoffice database.
+`20261103160000_align_jwt_claim_helpers.sql` aligns JWT claim extraction with
+the Bravigo baseline, including fallback for empty root claims to `app_metadata`.
 
 ```sh
 supabase migration up --local
@@ -122,6 +131,7 @@ the local DVLive bootstrap migration to an existing Bravigo database.
 
 ```dotenv
 DVLIVE_ENV=STAG
+DVLIVE_API_TOKEN=<server-only-dvlive-api-token>
 ```
 
 Optional SDK logging is configured in the same `supabase/.env` file:
@@ -177,17 +187,17 @@ const api = new ApiService({
 });
 const result = await api.getShowVote(uuid);
 // result.data: ShowVote; result.status: number; result.headers: Headers
-return json(result.data, result.status);
+return json({ ok: true, data: result.data }, result.status);
 ```
 
-The wrapper remains internal to the SDK: the public JSON is the mapped `result.data`.
+The SDK wrapper remains internal; the adapter wraps mapped `result.data` in the BBM envelope.
 The SDK decodes DV Live responses in `supabase/functions/_shared/sdk/src/responses/`, then converts them
 into public model instances through their static `fromResponse()` factories in
 `supabase/functions/_shared/sdk/src/models/`. Customize output fields and transformations in those factories;
 the Edge Function receives and serializes the resulting model.
 Current models keep existing field names and omit additional upstream properties.
 Malformed response fields are rejected before DTO conversion.
-The actual status code is preserved. HTTP errors retain their original status and payload, including text payloads;
+The actual status code is preserved. HTTP errors retain their original status, with upstream payloads in `error.details`;
 request parameter or body validation errors become `400`, network or decoding errors become `502`, and timeouts become `504`.
 The default timeout is 15 seconds; no automatic retries are performed.
 
@@ -207,11 +217,11 @@ and local variables editable at the start of each test. They require `curl` and 
 ```
 
 No `export` is needed. For remote Supabase, set `SUPABASE_URL` and
-`SUPABASE_ANON_KEY` in `script/config.json`, along with
-`DVLIVE_BEARER_TOKEN`.
+`SUPABASE_ANON_KEY` and SmartUser login configuration in `script/config.json`.
 Locally, the default URL is `http://127.0.0.1:54321`; the key is resolved
 as in `atom`: from the environment, then `supabase status -o json`, then the local demo key.
-The DV Live token is sent through `bearer-token` and does not belong in the server's `.env` file.
+The DV Live token belongs in the server secret `DVLIVE_API_TOKEN`.
+`DVLIVE_BEARER_TOKEN` in script config is used only by direct add-vote.
 
 Details, POST scripts, and available variables: [script/README.md](script/README.md).
 SDK tests use mocked HTTP responses and run separately from the live smoke tests:

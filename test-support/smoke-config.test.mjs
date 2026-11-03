@@ -41,14 +41,15 @@ print('N_mock-session')
     assert.equal(result.stdout.trim(), 'N_mock-session');
   }
 });
-test('show smoke and direct add-vote share JSON bearer and show UUID', t => {
+test('show smoke uses app JWT while direct add-vote retains upstream bearer', t => {
   const f = fixture(t);
+  f.environment.APP_JWT = 'test-app-jwt';
   writeFileSync(join(f.directory, 'curl'), `#!/usr/bin/env python3
 import sys,json,os
 a=sys.argv[1:]
 open(os.environ['CAPTURE'],'w').write(json.dumps(a))
 post='POST' in a
-data={'status':'success','code':201,'message':'Recorded'} if post else {'name':'Show','startDate':'start','endDate':'end','round':None}
+data={'status':'success','code':201,'message':'Recorded'} if post else {'ok':True,'data':{'name':'Show','startDate':'start','endDate':'end','round':None}}
 open(a[a.index('--output')+1],'w').write(json.dumps(data))
 print('201' if post else '200',end='')
 `, { mode: 0o755 });
@@ -61,7 +62,9 @@ print('201' if post else '200',end='')
       assert.match(args.at(-1), /show-vote\/json-show%2Fa\/voter\/absolute-user\/add-vote$/);
       assert.ok(!args.includes('apikey: test-key'));
     } else {
-      assert.ok(args.includes('bearer-token: test-bearer'));
+      assert.ok(!args.some(arg => arg.startsWith('bearer-token:')));
+      assert.ok(args.includes('Authorization: Bearer test-app-jwt'));
+      assert.ok(args.includes('apikey: test-key'));
       assert.equal(new URL(args.at(-1)).searchParams.get('uuid'), f.settings.SHOW_VOTE_UUID);
     }
   }

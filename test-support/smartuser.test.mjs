@@ -87,7 +87,7 @@ test('signup failure stops before login and cleans up; non-email username is rej
 
 test('smoke session exchanges N for the same syncUser JWT used by the frontend', async () => {
   const fake = sdk();
-  const data = { access_token: 'app.jwt.test', expires_in: 1500, absolute_reference: 'user', user_id: 'user' };
+  const data = { access_token: 'app.jwt.test', expires_in: 1500, absolute_reference: 'smartuser-reference', user_id: 'profile-uuid' };
   const result = await getSmartUserAppSession({ ...config, supabaseUrl: 'http://edge.test', supabaseKey: 'anon-key' }, fake.load, async (url, options) => {
     assert.equal(url, 'http://edge.test/functions/v1/bolt-auth-proxy');
     assert.deepEqual(JSON.parse(options.body), { command: 'syncUser', service_slug: 'dvlive', userToken: 'N_test-session' });

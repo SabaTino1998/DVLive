@@ -22,11 +22,18 @@ Vedere `.env.example`. Non inserire username e password personali nel bundle:
 vengono immessi nel form di login o signup.
 
 Usare una chiave Supabase anon o publishable, mai `sb_secret_` o service-role.
-Le variabili `EXPO_PUBLIC_` sono incluse nell’app, compresi App Secret SmartUser e
-bearer DV Live usati da questa integrazione di test, come nella configurazione client
-di Bravigo. Usare credenziali dedicate a questo ambiente.
+Le variabili `EXPO_PUBLIC_` sono incluse nell’app, compreso App Secret SmartUser,
+come nella configurazione client di Bravigo. Usare credenziali dedicate a questo ambiente.
+Il token DV Live è configurato esclusivamente nel backend BBM come secret
+`DVLIVE_API_TOKEN`; non impostare `DVLIVE_BEARER_TOKEN` o
+`EXPO_PUBLIC_DVLIVE_BEARER_TOKEN` nell’app.
 
-Con Supabase locale, dalla root del repository:
+Il client richiede la Edge Function del pack `packs/bbm` con il nuovo contratto
+`{ ok, data }` / `{ ok: false, error }`. Impostare `SUPABASE_URL` su quel backend.
+La funzione e gli smoke script di questo repository implementano lo stesso contratto.
+
+Per avviare il backend locale, configurare `DVLIVE_API_TOKEN` in `supabase/.env`
+e dalla root del repository eseguire:
 
 ```bash
 supabase start
@@ -54,8 +61,14 @@ compatibile se la versione installata di Expo Go supporta solo SDK più recenti.
 Tutte le chiamate DV Live passano direttamente dalla Edge Function Supabase.
 `resolveUser.ts` e `supabase.ts` sono quelli originali di Bravigo: `syncUser`
 restituisce il JWT applicativo, persistito con scadenza tramite `setAppToken`.
-Il client DVLive invia quel JWT in `Authorization`; la edge ricava `userRef` e
-`uniqRef` dal claim `sub`. Non vengono inviati riferimenti utente dal client.
+Il client DVLive invia quel JWT in `Authorization: Bearer <access_token>` per tutti
+i cinque comandi, insieme ad `apikey`. Non invia `bearer-token`. La edge BBM ricava
+`userRef` e `uniqRef` dal claim `absolute_reference`, piatto o in `app_metadata`;
+`sub` è l’UUID del profilo interno. Non vengono inviati riferimenti utente dal client.
+Il client restituisce `data` dopo aver verificato `ok: true`; gli errori espongono
+`message`, `code`, `details` e lo status HTTP tramite `DvLiveError`.
+`castVote` è disponibile nel client con `votes` e i campi antifrode opzionali;
+l’interfaccia attuale mostra soltanto saldo e dettagli.
 Alla scadenza, o dopo un 401, il client rinnova il JWT con `syncSupabaseSession`.
 `EXPO_PUBLIC_SERVICE_SLUG=dvlive` seleziona servizio e credenziali backend.
 Signup salva lo stato di registrazione voter pendente prima di `syncUser`, per
@@ -83,7 +96,7 @@ Il saldo `remainingPoints` è presentato come **Available votes**; `standardPoin
 I nomi dei campi API restano invariati.
 
 La configurazione DV Live usa i nomi originali `SUPABASE_URL`,
-`SUPABASE_ANON_KEY`, `DVLIVE_BEARER_TOKEN` e `SHOW_VOTE_UUID`, senza alias
+`SUPABASE_ANON_KEY` e `SHOW_VOTE_UUID`, senza alias
 `EXPO_PUBLIC_` duplicati. `app.config.ts` li seleziona nel campo `extra.dvlive`
 e il client li legge tramite Expo Constants. Questi valori restano visibili
 nella configurazione pubblica dell’app; cambiare il nome non li rende segreti.

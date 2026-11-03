@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import ts from '../supabase/functions/_shared/sdk/node_modules/typescript/lib/typescript.js';
+import ts from '../supabase/functions/_shared/dvlive-sdk/node_modules/typescript/lib/typescript.js';
 
 const cache = new Map();
 export async function edgeModule(relative) {
@@ -11,7 +11,7 @@ export async function edgeModule(relative) {
   for (const match of [...source.matchAll(/(?:from\s+|import\(\s*)["']([^"']+)["']/g)]) {
     const name = match[1];
     const target = name.startsWith('.') ? await edgeModule(new URL(name, url).href)
-      : name === '@digitalvirgo/dvlive-api' ? new URL('../supabase/functions/_shared/sdk/dist/index.js', import.meta.url).href
+      : name === '@digitalvirgo/dvlive-api' ? new URL('../supabase/functions/_shared/dvlive-sdk/dist/index.js', import.meta.url).href
       : name === 'jsr:@zaubrik/djwt@3.0.2' ? import.meta.resolve('@jsr/zaubrik__djwt')
       : import.meta.resolve(name.replace(/^npm:/, '').replace(/(@[^/@]+)$/, ''));
     source = source.replace(match[0], match[0].replace(/["'][^"']+["']$/, JSON.stringify(target)));

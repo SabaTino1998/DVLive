@@ -54,10 +54,12 @@ Questo smoke esegue il setup SmartUser, poi sempre il login username/password
 con `loginWithEmail()`, e stampa il token `N_…` restituito da
 `getUserToken()`. Non chiama DV Live e non recupera email o telefono.
 Se setup o login falliscono, oppure il token dopo il login non è `N_…`, termina con errore.
-Gli smoke voter non inviano `userRef`/`uniqRef`: eseguono login SmartUser,
+Gli smoke dei cinque comandi non inviano `userRef`/`uniqRef`: eseguono login SmartUser,
 poi `syncUser` con il token N e `service_slug` (default `dvlive`). Usano il JWT
-restituito in `Authorization`. La edge ricava l’identità dal `sub` verificato.
-Il token API DVLive rimane nel distinto header `bearer-token`.
+restituito in `Authorization`. La edge ricava l’identità da `absolute_reference` nel JWT verificato, anche in
+`app_metadata`. Il token API DVLive è nel secret server `DVLIVE_API_TOKEN`;
+gli smoke dei comandi non inviano `bearer-token`. Le risposte usano l’envelope
+`{ ok, data }`; le verifiche dei campi operano su `data`.
 
 Per verificare solo autenticazione e JWT, senza modificare voter:
 
@@ -118,7 +120,7 @@ indicato, sostituendolo se esiste; altrimenti viene stampato.
 | `SUPABASE_URL` | `http://127.0.0.1:54321` |
 | `SUPABASE_ANON_KEY` | Ambiente, poi `supabase status -o json`, poi chiave demo locale |
 | `REPO_ROOT` | Repository corrente, usato per `supabase status` |
-| `DVLIVE_BEARER_TOKEN` | Obbligatorio per le cinque mode; header `bearer-token`, senza prefisso Bearer |
+| `DVLIVE_BEARER_TOKEN` | Solo per lo smoke add-vote diretto, senza prefisso Bearer |
 | `SHOW_VOTE_UUID` | `00000000-0000-4000-8000-000000000001` (esempio del runner) |
 | `CHOICE_UUID` | `22222222-2222-4222-8222-222222222201` (esempio del runner) |
 | `USER_REF` | Absolute reference per il solo smoke add-vote diretto; altrimenti derivata dalla sessione |
