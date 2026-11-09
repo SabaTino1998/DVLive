@@ -6,6 +6,13 @@ function consumePackage(api: ApiService): Promise<ApiResponse<ShowVote>> {
 }
 void consumePackage;
 
+async function consumeNomination(api: ApiService) {
+  const result = await api.getShowVote("show");
+  const isNominated: boolean | undefined = result.data.round?.choices[0]?.isNominated;
+  return isNominated;
+}
+void consumeNomination;
+
 const environment: string | undefined = "PROD";
 new ApiService({ environment });
 const parsed = parseMode("getShowVote");

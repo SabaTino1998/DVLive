@@ -11,6 +11,11 @@ export function string(value: unknown, path: string): string {
   return value;
 }
 
+export function boolean(value: unknown, path: string): boolean {
+  if (typeof value !== "boolean") throw new TypeError(`${path} must be a boolean.`);
+  return value;
+}
+
 export function integer(value: unknown, path: string): number {
   if (typeof value !== "number" || !Number.isInteger(value)) {
     throw new TypeError(`${path} must be an integer.`);

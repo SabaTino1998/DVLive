@@ -32,6 +32,7 @@ export class ReintroducedRound {
 }
 
 export class Choice {
+  declare readonly isNominated?: boolean;
   declare readonly bio?: string | null;
   declare readonly desktopPicture?: string | null;
   declare readonly mobilePicture?: string | null;
@@ -44,10 +45,12 @@ export class Choice {
     bio?: string | null,
     desktopPicture?: string | null,
     mobilePicture?: string | null,
+    isNominated?: boolean,
   ) {
     if (bio !== undefined) this.bio = bio;
     if (desktopPicture !== undefined) this.desktopPicture = desktopPicture;
     if (mobilePicture !== undefined) this.mobilePicture = mobilePicture;
+    if (isNominated !== undefined) this.isNominated = isNominated;
   }
 
   static fromResponse(response: ChoiceResponse): Choice {
@@ -59,6 +62,7 @@ export class Choice {
       response.bio,
       response.desktopPicture,
       response.mobilePicture,
+      response.isNominated,
     );
   }
 }

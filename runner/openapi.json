@@ -962,6 +962,9 @@
                         "type": "string",
                         "enum": ["EVICTED", "PRESENT"]
                     },
+                    "isNominated": {
+                        "type": "boolean"
+                    },
                     "bio": {
                         "type": "string",
                         "nullable": true

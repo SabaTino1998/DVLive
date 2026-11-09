@@ -1,6 +1,6 @@
 export interface Session { email: string; needsRegistration: boolean }
 export interface Choice {
-  uuid: string; firstname: string; lastname: string; status: string;
+  uuid: string; firstname: string; lastname: string; status: string; isNominated?: boolean;
   bio?: string | null; desktopPicture?: string | null; mobilePicture?: string | null;
 }
 export interface ChoiceDetail extends Choice {

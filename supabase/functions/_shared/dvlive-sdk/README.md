@@ -124,6 +124,10 @@ and `CastVoteResult`. Previous public `*Response` names have been
 removed rather than retained as aliases. The mode catalog now reports DTO names.
 Field names in the returned JSON are unchanged; additional upstream fields are omitted.
 
+`ShowVote.round.choices` exposes `isNominated?: boolean` on each `Choice`.
+When supplied, it must be a boolean; `true` and `false` are preserved, and an
+absent field remains absent.
+
 `votes`, `choiceUuid`, and `nbVotes` are required in vote requests.
 `REFERAL` retains the upstream spelling. Successful vote and credit DTOs
 include `nbVoteRemaining`.

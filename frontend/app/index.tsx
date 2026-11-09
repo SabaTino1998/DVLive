@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
 import { dvlive } from '../lib/dvlive';
 import { registerSignupVoter } from '../lib/voterFlow';
-import type { Show, Voter } from '../src/types';
+import type { Choice, Show, Voter } from '../src/types';
 import { Action, colors, errorMessage, Eyebrow, Gate, Loading, Notice, Page, formatVotes, Portrait, s, Status, statusLabel } from '../components/UI';
 
 export default function Home() { return <Gate><HomeContent /></Gate>; }
@@ -37,7 +37,8 @@ function HomeContent() {
   }, [token, attempt]);
   const retry = () => setAttempt(value => value + 1);
   const choices = show?.round?.choices ?? [];
-  const filtered = choices.filter(choice => (filter === 'ALL' || choice.status === filter) && `${choice.firstname} ${choice.lastname}`.toLocaleLowerCase('en').includes(search.toLocaleLowerCase('en')));
+  const matchesFilter = (choice: Choice, value: string) => value === 'ALL' || (value === 'NOMINATED' ? choice.isNominated === true : choice.status === value);
+  const filtered = choices.filter(choice => matchesFilter(choice, filter) && `${choice.firstname} ${choice.lastname}`.toLocaleLowerCase('en').includes(search.toLocaleLowerCase('en')));
   const columns = width >= 1150 ? 4 : width >= 800 ? 3 : width >= 500 ? 2 : 1;
   const cardWidth = columns === 4 ? '23.5%' : columns === 3 ? '32%' : columns === 2 ? '48%' : '100%';
   return <Page>
@@ -72,18 +73,21 @@ function HomeContent() {
     <View style={[h.toolbar, { flexDirection: wide ? 'row' : 'column' }]}>
       <View style={h.filters}>
         {[
-          ['ALL', 'All'], ['PRESENT', 'Present'], ['EVICTED', 'Evicted'],
+          ['ALL', 'All'], ['PRESENT', 'Present'], ['EVICTED', 'Evicted'], ['NOMINATED', 'Nominated'],
         ].map(([value, label]) => <Pressable accessibilityRole="button" accessibilityState={{ selected: value === filter }} key={value} onPress={() => setFilter(value)} style={[h.filter, value === filter && h.filterActive]}>
-          <Text style={[h.filterText, value === filter && { color: colors.blue }]}>{label} ({choices.filter(choice => value === 'ALL' || choice.status === value).length})</Text>
+          <Text style={[h.filterText, value === filter && { color: colors.blue }]}>{label} ({choices.filter(choice => matchesFilter(choice, value)).length})</Text>
         </Pressable>)}
       </View>
       <TextInput accessibilityLabel="Search choices" placeholder="Search choices" placeholderTextColor={colors.muted} value={search} onChangeText={setSearch} style={[h.search, { width: wide ? 240 : '100%' }]} />
     </View>
     {showError ? <Notice retry={retry}>{showError}</Notice> : busy && !show ? <Loading label="Loading choices…" /> : filtered.length ? <View style={h.grid}>
-      {filtered.map(choice => <Pressable accessibilityRole="link" accessibilityLabel={`${choice.firstname} ${choice.lastname}, ${statusLabel(choice.status)}`} key={choice.uuid} onPress={() => router.push({ pathname: '/choices/[uuid]', params: { uuid: choice.uuid } })} style={({ pressed }) => [h.card, { width: cardWidth, opacity: pressed ? .7 : 1 }]}>
+      {filtered.map(choice => <Pressable accessibilityRole="link" accessibilityLabel={`${choice.firstname} ${choice.lastname}, ${statusLabel(choice.status)}${choice.isNominated === true ? ', nominated' : ''}`} key={choice.uuid} onPress={() => router.push({ pathname: '/choices/[uuid]', params: { uuid: choice.uuid } })} style={({ pressed }) => [h.card, { width: cardWidth, opacity: pressed ? .7 : 1 }]}>
         <Portrait choice={choice} />
         <View style={h.caption}>
-          <Status value={choice.status} />
+          <View style={h.chips}>
+            <Status value={choice.status} />
+            {choice.isNominated === true && <Text style={h.nominated}>NOMINATED</Text>}
+          </View>
           <Text style={h.name}>{choice.firstname} {choice.lastname}</Text>
           <Text style={h.detailsLink}>View choice →</Text>
         </View>
@@ -109,6 +113,8 @@ const h = StyleSheet.create({
   filters: { flexDirection: 'row', gap: 5, flexWrap: 'wrap', alignItems: 'center' }, filter: { paddingHorizontal: 13, paddingVertical: 10, borderRadius: 6 }, filterActive: { backgroundColor: '#e9efff' }, filterText: { color: colors.muted, fontSize: 12 },
   search: { minHeight: 40, paddingHorizontal: 12, borderWidth: 1, borderColor: colors.line, borderRadius: 6, backgroundColor: '#fff', fontSize: 13, color: colors.ink },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-start', gap: '2%', rowGap: 20 }, card: { backgroundColor: '#fff', borderWidth: 1, borderColor: colors.line, borderRadius: 8, overflow: 'hidden' },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
+  nominated: { color: colors.blue, backgroundColor: '#e9efff', borderRadius: 4, paddingHorizontal: 7, paddingVertical: 2, fontSize: 10, lineHeight: 18, letterSpacing: .4, fontWeight: '700' },
   caption: { padding: 16, gap: 8 }, name: { color: colors.ink, fontSize: 18, lineHeight: 25, fontWeight: '600' }, detailsLink: { color: colors.blue, fontSize: 12, marginTop: 6 },
   empty: { padding: 40, alignItems: 'center', gap: 15, backgroundColor: '#fff', borderWidth: 1, borderColor: colors.line, borderRadius: 8 }, emptyTitle: { color: colors.ink, fontSize: 19, fontWeight: '600', textAlign: 'center' },
 });

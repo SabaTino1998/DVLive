@@ -8,6 +8,29 @@ import { GetVoterResponse, CreateVoterResponse, CastVoteResponse } from "../dist
 import { cases, show, choice, voter } from "./responses.fixture.mjs";
 
 const specification = JSON.parse(await readFile(new URL("../../../../../runner/openapi.json", import.meta.url), "utf8"));
+
+test("round choice isNominated preserves booleans, permits omission and rejects other types", async (t) => {
+  const participant = { uuid: "choice", firstname: "First", lastname: "Last", status: "PRESENT" };
+  const payload = (fields) => ({ ...show, round: {
+    currentRound: 1, startDay: "start", endDay: "end", name: "Round",
+    choices: [{ ...participant, ...fields }],
+  } });
+  for (const fields of [{ isNominated: true }, { isNominated: false }, {}]) {
+    t.mock.method(globalThis, "fetch", async () => new Response(JSON.stringify(payload(fields))));
+    const result = await new ApiService({ environment: "STAG" }).getShowVote("show");
+    const decoded = JSON.parse(JSON.stringify(result.data)).round.choices[0];
+    assert.deepEqual(decoded, { ...participant, ...fields });
+  }
+  for (const isNominated of [null, "false", 0, 1, {}, []]) {
+    const invalid = payload({ isNominated });
+    t.mock.method(globalThis, "fetch", async () => new Response(JSON.stringify(invalid)));
+    await assert.rejects(new ApiService({ environment: "STAG" }).getShowVote("show"), error => {
+      assert.ok(error instanceof ApiResponseError);
+      assert.equal(error.cause.message, "ShowVoteResponse.round.choices[0].isNominated must be a boolean.");
+      return true;
+    });
+  }
+});
 const endpoints = [
   ["getShowVote", ShowVoteResponse, "ShowVoteResponse"],
   ["getShowVoteChoice", ShowVoteChoiceResponse, "ShowVoteChoiceResponse"],

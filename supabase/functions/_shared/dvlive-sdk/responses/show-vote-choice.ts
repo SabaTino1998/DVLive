@@ -1,4 +1,4 @@
-import { integer, nullable, object, string } from "./decoding.ts";
+import { boolean, integer, nullable, object, string } from "./decoding.ts";
 
 export type ChoiceStatusResponse = "EVICTED" | "PRESENT";
 
@@ -43,6 +43,7 @@ export class ReintroducedRoundResponse {
 }
 
 export class ChoiceResponse {
+  declare isNominated?: boolean;
   declare bio?: string | null;
   declare desktopPicture?: string | null;
   declare mobilePicture?: string | null;
@@ -65,6 +66,7 @@ export class ChoiceResponse {
     if (source.bio !== undefined) response.bio = nullable(source.bio, string, `${path}.bio`);
     if (source.desktopPicture !== undefined) response.desktopPicture = nullable(source.desktopPicture, string, `${path}.desktopPicture`);
     if (source.mobilePicture !== undefined) response.mobilePicture = nullable(source.mobilePicture, string, `${path}.mobilePicture`);
+    if (source.isNominated !== undefined) response.isNominated = boolean(source.isNominated, `${path}.isNominated`);
     return response;
   }
 }
