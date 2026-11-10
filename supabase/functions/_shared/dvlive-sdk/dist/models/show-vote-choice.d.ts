@@ -18,10 +18,11 @@ export declare class Choice {
     readonly firstname: string;
     readonly lastname: string;
     readonly status: ChoiceStatus;
+    readonly isNominated?: boolean;
     readonly bio?: string | null;
     readonly desktopPicture?: string | null;
     readonly mobilePicture?: string | null;
-    constructor(uuid: string, firstname: string, lastname: string, status: ChoiceStatus, bio?: string | null, desktopPicture?: string | null, mobilePicture?: string | null);
+    constructor(uuid: string, firstname: string, lastname: string, status: ChoiceStatus, bio?: string | null, desktopPicture?: string | null, mobilePicture?: string | null, isNominated?: boolean);
     static fromResponse(response: ChoiceResponse): Choice;
 }
 export declare class ShowVoteChoice {

@@ -26,7 +26,7 @@ export class Choice {
     firstname;
     lastname;
     status;
-    constructor(uuid, firstname, lastname, status, bio, desktopPicture, mobilePicture) {
+    constructor(uuid, firstname, lastname, status, bio, desktopPicture, mobilePicture, isNominated) {
         this.uuid = uuid;
         this.firstname = firstname;
         this.lastname = lastname;
@@ -37,9 +37,11 @@ export class Choice {
             this.desktopPicture = desktopPicture;
         if (mobilePicture !== undefined)
             this.mobilePicture = mobilePicture;
+        if (isNominated !== undefined)
+            this.isNominated = isNominated;
     }
     static fromResponse(response) {
-        return new Choice(response.uuid, response.firstname, response.lastname, response.status, response.bio, response.desktopPicture, response.mobilePicture);
+        return new Choice(response.uuid, response.firstname, response.lastname, response.status, response.bio, response.desktopPicture, response.mobilePicture, response.isNominated);
     }
 }
 export class ShowVoteChoice {

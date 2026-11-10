@@ -2,7 +2,7 @@ import { ShowVoteResponse } from "./responses/show-vote.js";
 import { ShowVoteChoiceResponse } from "./responses/show-vote-choice.js";
 import { GetVoterResponse, CreateVoterResponse, CastVoteResponse } from "./responses/voter.js";
 import { ApiHttpError, ApiRequestError, ApiResponseError } from "./ApiErrors.js";
-import { resolveBaseUrl } from "./environment.js";
+import { resolveAlbTokenSlot, resolveBaseUrl } from "./environment.js";
 import { ApiResponse } from "./models/api-response.js";
 import { ShowVote } from "./models/show-vote.js";
 import { ShowVoteChoice } from "./models/show-vote-choice.js";
@@ -14,12 +14,14 @@ import { DvLiveLogger } from "./logger.js";
 export class ApiService {
     url;
     extraHeaders;
+    albTokens;
     timeoutMs;
     logger;
     constructor(config) {
         this.url = resolveBaseUrl(config.environment);
         this.logger = new DvLiveLogger(config.logEnable, config.logLevel);
         this.extraHeaders = config.headers;
+        this.albTokens = config.albTokens ?? {};
         this.timeoutMs = config.timeoutMs ?? 15000;
         if (!Number.isInteger(this.timeoutMs) || this.timeoutMs <= 0 || this.timeoutMs > 2147483647) {
             throw new TypeError("timeoutMs must be a positive 32-bit integer.");
@@ -90,16 +92,27 @@ export class ApiService {
     voterPath(showVoteUuid) {
         return `/show-vote/${encodeURIComponent(showVoteUuid)}/voter`;
     }
+    albAuthHeader() {
+        const slot = resolveAlbTokenSlot(new URL(this.url).hostname);
+        if (!slot)
+            return {};
+        const token = this.albTokens[slot]?.trim();
+        return token ? { "X-Internal-Auth": token } : {};
+    }
     async request(operation, method, path, body) {
         const extra = typeof this.extraHeaders === "function" ? this.extraHeaders() : this.extraHeaders;
-        const headers = new Headers({ Accept: "application/json", ...(body === undefined ? {} : { "Content-Type": "application/json" }) });
+        const headers = new Headers({
+            Accept: "application/json",
+            ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+            ...this.albAuthHeader(),
+        });
         new Headers(extra).forEach((value, key) => headers.set(key, value));
         const requestBody = body === undefined ? undefined : JSON.stringify(body);
         const signal = AbortSignal.timeout(this.timeoutMs);
         const started = Date.now();
         const secrets = [];
         headers.forEach((value, key) => {
-            if (/authorization|token|key/i.test(key))
+            if (/authorization|token|key|x-internal-auth/i.test(key))
                 secrets.push(value, value.replace(/^Bearer\s+/i, ""));
         });
         const voterRef = path.match(/\/voter\/([^/]+)/)?.[1];

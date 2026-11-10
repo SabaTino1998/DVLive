@@ -72,6 +72,13 @@ The DV Live upstream token is the server secret `DVLIVE_API_TOKEN` in
 `Authorization: Bearer <token>` on upstream SDK calls. Callers never send
 `bearer-token` or the DV Live token. Never expose `DVLIVE_API_TOKEN` to app clients.
 
+Optional ALB tokens (`DVLIVE_ALB_TOKEN_DEV`, `DVLIVE_ALB_TOKEN_STAG`,
+`DVLIVE_ALB_TOKEN_PROD`) set `X-Internal-Auth` on upstream calls. The webshow
+ALB allows a request only when both the `Host` header and this token match; a
+missing token returns upstream HTTP 404. Selection is by the SDK host, so a
+`DVLIVE_ENV=STAG` deployment that calls `dev-webshow-engine.dv-live.com` uses
+`DVLIVE_ALB_TOKEN_DEV`. Leave the secrets unset to omit the header.
+
 Supabase gateway authentication is separate. Currently, [config.toml](config.toml)
 sets `verify_jwt = false` for this function. For requests to a remote project,
 still send the Supabase headers required by the gateway and the project's key type.
@@ -117,6 +124,9 @@ If `supabase/.env` does not exist, create it by copying
 ```dotenv
 DVLIVE_ENV=STAG
 DVLIVE_API_TOKEN=<server-only-dvlive-api-token>
+# DVLIVE_ALB_TOKEN_DEV=<alb-token-for-dev-webshow-engine>
+# DVLIVE_ALB_TOKEN_STAG=<alb-token-for-stag-webshow-engine>
+# DVLIVE_ALB_TOKEN_PROD=<alb-token-for-webshow-engine>
 DVLIVE_LOG_ENABLE=FALSE
 DVLIVE_LOG_LEVEL=WARNING
 ```
@@ -124,6 +134,9 @@ DVLIVE_LOG_LEVEL=WARNING
 - `DVLIVE_ENV`: `STAG` or `PROD`. The SDK selects the corresponding DV Live URL;
   a missing or unsupported value produces HTTP 500 for operation requests.
 - `DVLIVE_API_TOKEN`: server-only DV Live API token, without a `Bearer` prefix.
+- `DVLIVE_ALB_TOKEN_DEV`, `DVLIVE_ALB_TOKEN_STAG`, `DVLIVE_ALB_TOKEN_PROD`:
+  optional ALB tokens for `X-Internal-Auth`, chosen by upstream host. STAG today
+  uses the DEV token. Unset or blank omits the header.
 - `DVLIVE_LOG_ENABLE`: `TRUE` enables SDK logging; the default is `FALSE`.
 - `DVLIVE_LOG_LEVEL`: `WARNING`, `INFO`, or `DEBUG`; the default is `WARNING`.
   The level is ignored when logging is disabled.

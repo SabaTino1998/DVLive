@@ -1,4 +1,4 @@
-import { integer, nullable, object, string } from "./decoding.js";
+import { boolean, integer, nullable, object, string } from "./decoding.js";
 function decodeChoiceStatus(value, path) {
     switch (value) {
         case "EVICTED":
@@ -53,6 +53,8 @@ export class ChoiceResponse {
             response.desktopPicture = nullable(source.desktopPicture, string, `${path}.desktopPicture`);
         if (source.mobilePicture !== undefined)
             response.mobilePicture = nullable(source.mobilePicture, string, `${path}.mobilePicture`);
+        if (source.isNominated !== undefined)
+            response.isNominated = boolean(source.isNominated, `${path}.isNominated`);
         return response;
     }
 }

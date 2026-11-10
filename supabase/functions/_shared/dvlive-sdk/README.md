@@ -322,10 +322,15 @@ prebuilt `dist/`. Set the Supabase environment file to:
 ```dotenv
 DVLIVE_ENV=STAG
 DVLIVE_API_TOKEN=<server-only-dvlive-api-token>
+# DVLIVE_ALB_TOKEN_DEV=<alb-token-for-dev-webshow-engine>
+# DVLIVE_ALB_TOKEN_STAG=<alb-token-for-stag-webshow-engine>
+# DVLIVE_ALB_TOKEN_PROD=<alb-token-for-webshow-engine>
 ```
 
 The Edge Function passes `DVLIVE_ENV` directly as `environment` to the SDK and
 supplies `Authorization: Bearer` from the server secret `DVLIVE_API_TOKEN`.
+Optional `DVLIVE_ALB_TOKEN_*` values are passed as `albTokens`; the SDK sets
+`X-Internal-Auth` from the request host when the matching token is non-blank.
 Callers do not send `bearer-token` or the DV Live token. Only the SDK validates
 supported environment values and selects the upstream base URL. Missing or
 invalid configuration returns HTTP 500, while the mode catalog remains available.

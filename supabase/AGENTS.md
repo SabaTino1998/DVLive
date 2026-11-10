@@ -42,6 +42,11 @@ const api = new ApiService({
   environment: env("DVLIVE_ENV"),
   logEnable: env("DVLIVE_LOG_ENABLE"),
   logLevel: env("DVLIVE_LOG_LEVEL"),
+  albTokens: {
+    dev: env("DVLIVE_ALB_TOKEN_DEV"),
+    stag: env("DVLIVE_ALB_TOKEN_STAG"),
+    prod: env("DVLIVE_ALB_TOKEN_PROD"),
+  },
   headers: () => ({ Authorization: `Bearer ${token}` }),
 });
 ```
@@ -53,6 +58,14 @@ URLs in the function. Invalid SDK configuration returns HTTP 500.
 Read the fixed DV Live token from server secret `DVLIVE_API_TOKEN`, trim it,
 and return a 500 `CONFIGURATION_ERROR` when absent. Ignore caller `bearer-token`.
 Supply the secret as upstream `Authorization: Bearer <token>` and never log it.
+
+Optional ALB tokens `DVLIVE_ALB_TOKEN_DEV`, `DVLIVE_ALB_TOKEN_STAG`, and
+`DVLIVE_ALB_TOKEN_PROD` are trimmed and passed as `albTokens`. The SDK sets
+`X-Internal-Auth` from the request hostname. STAG today calls
+`dev-webshow-engine.dv-live.com` and therefore uses the DEV token. Unset or
+blank values omit the header; a missing ALB token is not a configuration error.
+Never log these tokens. The ALB returns upstream 404 when the token is missing
+while the rule is enforcing; preserve that status as `UPSTREAM_ERROR`.
 
 Supabase gateway authentication is separate from DV Live authentication.
 `verify_jwt` is false for both functions. All five commands require an app JWT
