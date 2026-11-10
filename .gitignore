@@ -1,2 +1,16 @@
 config.json
 node_modules/
+.env
+.env.*
+!.env.example
+supabase/.temp/
+supabase/.branches/
+supabase/functions/_shared/sdk/dist/
+*.tsbuildinfo
+# Ignore npm registry configuration and credentials at every directory level.
+**/.npmrc
+frontend/dist/
+frontend/.expo/
+frontend/android/
+frontend/ios/
+script/config.json
