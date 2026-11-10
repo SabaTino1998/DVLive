@@ -1,0 +1,1 @@
+{"version":3,"file":"api-result.d.ts","sourceRoot":"","sources":["../../src/models/api-result.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAE,QAAQ,EAAE,MAAM,gBAAgB,CAAC;AAC/C,OAAO,KAAK,EAAE,cAAc,EAAE,MAAM,uBAAuB,CAAC;AAC5D,OAAO,KAAK,EAAE,KAAK,EAAE,iBAAiB,EAAE,cAAc,EAAE,MAAM,YAAY,CAAC;AAE3E,2DAA2D;AAC3D,MAAM,MAAM,SAAS,GACjB,QAAQ,GACR,cAAc,GACd,KAAK,GACL,iBAAiB,GACjB,cAAc,CAAC"}

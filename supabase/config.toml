@@ -1,5 +1,10 @@
 project_id = "DVLive"
 
+[functions.bolt-auth-proxy]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/bolt-auth-proxy/index.ts"
+
 [functions.dvlive]
 enabled = true
 verify_jwt = false

@@ -1,0 +1,12 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "rootDir": "../../..",
+    "baseUrl": "../../..",
+    "paths": { "@digitalvirgo/dvlive-api": ["_shared/sdk/src/index.ts"] }
+  },
+  "include": ["../src/**/*.ts", "types.test.ts", "deno.d.ts", "../../../dvlive/index.ts"]
+}

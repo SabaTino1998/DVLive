@@ -1,207 +1,207 @@
-type PathParams = Record<string, string>;
-type JsonObject = Record<string, unknown>;
-interface Mode {
-  method: "GET" | "POST";
-  params: string[];
-  body: string[];
-  requiredBody?: string[];
-  description: string;
-  response: string;
-  path: (params: PathParams) => string;
-}
-interface HandlerOptions {
-  env: (name: string) => string | undefined;
-}
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import {
+  ApiService,
+  ApiHttpError,
+  ApiRequestError,
+  ApiResponseError,
+  ApiValidationError,
+  ApiModes,
+  API_MODES,
+  parseMode,
+  type ApiModeDefinition,
+  type ApiResult,
+  type ApiResponse,
+} from "@digitalvirgo/dvlive-api";
+import { verifyAppJwt } from "../_shared/verify-app-jwt.ts";
 
-const CORS_HEADERS = {
+const DVLIVE_ENV = Deno.env.get("DVLIVE_ENV") || "";
+const DVLIVE_API_TOKEN = Deno.env.get("DVLIVE_API_TOKEN") || "";
+const DVLIVE_LOG_ENABLE = Deno.env.get("DVLIVE_LOG_ENABLE");
+const DVLIVE_LOG_LEVEL = Deno.env.get("DVLIVE_LOG_LEVEL");
+const TAG = `[DVLive][${DVLIVE_ENV || "unset"}]`;
+
+const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey, bearer-token",
-  "Access-Control-Expose-Headers": "Retry-After",
+  "Access-Control-Allow-Headers":
+    "Content-Type, Authorization, X-Client-Info, Apikey",
 };
+
+function json(body: unknown, status: number, headers: Record<string, string> = {}): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json", ...headers },
+  });
+}
+
+function ok(data: unknown, status = 200): Response {
+  return json({ ok: true, data }, status);
+}
+
+function fail(
+  status: number,
+  message: string,
+  code: string,
+  details?: unknown,
+  headers: Record<string, string> = {},
+): Response {
+  const error: Record<string, unknown> = { message, code };
+  if (details !== undefined) error.details = details;
+  return json({ ok: false, error }, status, headers);
+}
 
 class InputError extends Error {
   readonly status: number;
+  readonly code: string;
   readonly headers: Record<string, string>;
 
-  constructor(message: string, status = 400, headers: Record<string, string> = {}) {
+  constructor(
+    message: string,
+    status = 400,
+    code = "VALIDATION",
+    headers: Record<string, string> = {},
+  ) {
     super(message);
     this.status = status;
+    this.code = code;
     this.headers = headers;
   }
 }
 
-function json(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...CORS_HEADERS, "Content-Type": "application/json; charset=utf-8", ...headers },
-  });
-}
-
-function error(status: number, message: string, headers: Record<string, string> = {}): Response {
-  return json({ status: "error", code: status, message }, status, headers);
-}
-
-export const modes: Record<string, Mode> = {
-  getShowVoteChoice: {
-    method: "GET", params: ["uuid"], body: [],
-    description: "Returns a participant: UUID, name, status, order, biography, images, and elimination/reintroduction rounds.",
-    response: "ShowVoteChoiceResponse",
-    path: ({ uuid }) => `/show-vote-choice/${uuid}`,
-  },
-  getShowVote: {
-    method: "GET", params: ["uuid"], body: [],
-    description: "Returns the show name and dates, current round, and its participants.",
-    response: "ShowVoteResponse",
-    path: ({ uuid }) => `/show-vote/${uuid}`,
-  },
-  createVoter: {
-    method: "POST", params: ["showVoteUuid"], body: ["email", "phone", "uniqRef"],
-    description: "Registers a voter and returns the operation result (status, code, message).",
-    response: "OperationResult",
-    path: ({ showVoteUuid }) => `/show-vote/${showVoteUuid}/voter`,
-  },
-  getVoter: {
-    method: "GET", params: ["showVoteUuid", "userRef"], body: [],
-    description: "Returns the voter reference and contact details, remaining points, fraud status, and balance breakdown.",
-    response: "GetVoterResponse",
-    path: ({ showVoteUuid, userRef }) => `/show-vote/${showVoteUuid}/voter/${userRef}`,
-  },
-  addVote: {
-    method: "POST", params: ["showVoteUuid", "userRef"], body: ["additionalVoteType", "nbPoints"],
-    description: "Credits additional votes and returns the operation result, including nbVoteRemaining when provided by the API.",
-    response: "OperationResult",
-    path: ({ showVoteUuid, userRef }) => `/show-vote/${showVoteUuid}/voter/${userRef}/add-vote`,
-  },
-  castVote: {
-    method: "POST", params: ["showVoteUuid", "userRef"],
-    body: ["votes", "sessionToken", "phoneFingerPrint", "ip", "userAgent", "uniqSubscriptionId"],
-    requiredBody: ["votes"],
-    description: "Casts votes for participants in the current round and returns the operation result, including nbVoteRemaining when provided by the API.",
-    response: "OperationResult",
-    path: ({ showVoteUuid, userRef }) => `/show-vote/${showVoteUuid}/voter/${userRef}/vote`,
-  },
-};
-
-const catalog = Object.fromEntries(
-  Object.entries(modes).map(([name, { path: _path, ...info }]) => [name, info]),
-);
-
-function isObject(value: unknown): value is JsonObject {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
-function validVote(value: unknown): boolean {
-  return isObject(value) && typeof value.choiceUuid === "string" && !!value.choiceUuid.trim()
-    && typeof value.nbVotes === "number" && Number.isInteger(value.nbVotes) && value.nbVotes > 0;
-}
-
-async function parseParams(req: Request, url: URL, action: Mode, mode: string) {
+async function parseRequestBody(req: Request, action: ApiModeDefinition, mode: ApiModes): Promise<unknown> {
   if (req.method !== action.method) {
-    throw new InputError(`Mode ${mode} requires ${action.method}.`, 405, { Allow: `${action.method}, OPTIONS` });
+    throw new InputError(
+      `Mode ${mode} requires ${action.method}.`,
+      405,
+      "METHOD_NOT_ALLOWED",
+      { Allow: `${action.method}, OPTIONS` },
+    );
   }
-  const params: PathParams = {};
-  for (const key of action.params) {
-    const value = url.searchParams.get(key);
-    if (!value?.trim()) throw new InputError(`Required query parameter: ${key}.`);
-    params[key] = encodeURIComponent(value);
+  if (action.method !== "POST") return undefined;
+  if (!/^application\/json(?:\s*;|$)/i.test(req.headers.get("content-type") ?? "")) {
+    throw new InputError("The request body must use application/json.", 415, "INVALID_JSON");
   }
-  let body: JsonObject | undefined;
-  if (action.method === "POST") {
-    if (!/^application\/json(?:\s*;|$)/i.test(req.headers.get("content-type") ?? "")) {
-      throw new InputError("The request body must use application/json.", 415);
-    }
-    let parsed: unknown;
-    try {
-      parsed = await req.json();
-    } catch {
-      throw new InputError("Invalid JSON body.");
-    }
-    if (!isObject(parsed)) throw new InputError("The request body must be a JSON object.");
-    body = parsed;
-    const unknown = Object.keys(body).filter((key) => !action.body.includes(key));
-    if (unknown.length) throw new InputError(`Unknown body fields: ${unknown.join(", ")}.`);
-    if (mode === "castVote" && (!Array.isArray(body.votes) || !body.votes.length || !body.votes.every(validVote))) {
-      throw new InputError("votes must contain at least one object with choiceUuid and a positive integer nbVotes.");
-    }
+  try {
+    return await req.json();
+  } catch {
+    throw new InputError("Invalid JSON body.", 400, "INVALID_JSON");
   }
-  return { params, body };
 }
 
-function upstreamUrl(baseUrl: string, path: string): URL {
-  const url = new URL(baseUrl.replace(/\/+$/, "") + path);
-  if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || url.search || url.hash) {
-    throw new Error("Invalid DVLIVE_BASE_URL.");
+function callApi(
+  api: ApiService,
+  mode: ApiModes,
+  query: URLSearchParams,
+  body: unknown,
+  userRef: string,
+): Promise<ApiResponse<ApiResult>> {
+  const uuid = query.get("uuid") ?? "";
+  const showVoteUuid = query.get("showVoteUuid") ?? "";
+
+  switch (mode) {
+    case ApiModes.GetShowVote:
+      return api.getShowVote(uuid);
+    case ApiModes.GetShowVoteChoice:
+      return api.getShowVoteChoice(uuid);
+    case ApiModes.GetVoter:
+      return api.getVoter({ showVoteUuid, userRef });
+    case ApiModes.CreateVoter:
+      return api.createVoter(
+        { showVoteUuid },
+        body && typeof body === "object" && !Array.isArray(body)
+          ? { ...body, uniqRef: userRef }
+          : { uniqRef: userRef },
+      );
+    case ApiModes.CastVote:
+      return api.castVote({ showVoteUuid, userRef }, body);
+    default: {
+      const unsupported: ApiModes = mode;
+      throw new InputError(`Unsupported mode: ${unsupported}.`, 400, "VALIDATION");
+    }
   }
-  return url;
 }
 
-export function createHandler({ env }: HandlerOptions) {
-  return async (req: Request): Promise<Response> => {
-    if (req.method === "OPTIONS") {
-      return new Response(null, { status: 204, headers: CORS_HEADERS });
+Deno.serve(async (req: Request): Promise<Response> => {
+  const ts = new Date().toISOString();
+
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 200, headers: corsHeaders });
+  }
+
+  try {
+    const url = new URL(req.url);
+    const parsed = parseMode(url.searchParams.get("mode"));
+    if (parsed.mode === null) {
+      console.log(`${TAG} ${ts} | catalog`);
+      return ok(parsed.catalog);
     }
+
+    const mode = parsed.mode;
+    const action = API_MODES[mode];
+    const body = await parseRequestBody(req, action, mode);
+
+    const auth = await verifyAppJwt(req);
+    if (!auth.ok) {
+      console.log(`${TAG} ${ts} | auth failed mode=${mode} status=${auth.status}`);
+      return fail(auth.status, auth.message, auth.status === 403 ? "FORBIDDEN" : auth.status === 500 ? "SERVER_MISCONFIGURED" : auth.status === 502 ? "AUTH_SERVICE_ERROR" : "AUTH_REQUIRED");
+    }
+
+    const needsUser =
+      mode === ApiModes.GetVoter ||
+      mode === ApiModes.CreateVoter ||
+      mode === ApiModes.CastVote;
+    const userRef = auth.claims.absolute_reference?.trim() ?? "";
+    if (needsUser && !userRef) {
+      return fail(403, "Missing absolute_reference claim.", "FORBIDDEN");
+    }
+
+    if (!DVLIVE_API_TOKEN || !DVLIVE_ENV) {
+      console.error(`${TAG} ${ts} | missing DVLIVE_API_TOKEN or DVLIVE_ENV`);
+      return fail(500, "DVLive is not configured.", "SERVER_MISCONFIGURED");
+    }
+
+    let api: ApiService;
     try {
-      const url = new URL(req.url);
-      const mode = url.searchParams.get("mode");
-      if (!mode) {
-        if (req.method !== "GET") {
-          throw new InputError("Use GET to retrieve the mode catalog.", 405, { Allow: "GET, OPTIONS" });
-        }
-        return json({
-          name: "DVLive",
-          description: "Select a mode in the URL query. Required params must be passed in the query; body fields must be sent as JSON in POST requests. Pass the DV Live token in the bearer-token header.",
-          modes: catalog,
-        });
-      }
-      if (!Object.hasOwn(modes, mode)) {
-        return json({ status: "error", code: 400, message: "Unknown mode.", modes: catalog }, 400);
-      }
-      const action = modes[mode];
-      const { params, body } = await parseParams(req, url, action, mode);
-      const token = req.headers.get("bearer-token")?.trim();
-      if (!token) throw new InputError("The bearer-token header is required (DV Live token without the Bearer prefix).", 401);
-      const baseUrl = env("DVLIVE_BASE_URL");
-      if (!baseUrl) return error(500, "Configure DVLIVE_BASE_URL on the server.");
-      let upstream: URL;
-      try {
-        upstream = upstreamUrl(baseUrl, action.path(params));
-      } catch {
-        return error(500, "Invalid DVLIVE_BASE_URL.");
-      }
-      try {
-        const response = await fetch(upstream, {
-          method: action.method,
-          headers: {
-            Accept: "application/json",
-            Authorization: `Bearer ${token}`,
-            ...(body === undefined ? {} : { "Content-Type": "application/json" }),
-          },
-          body: body === undefined ? undefined : JSON.stringify(body),
-          signal: AbortSignal.timeout(15000),
-          redirect: "error",
-        });
-        const headers: Record<string, string> = {
-          ...CORS_HEADERS,
-          "Content-Type": response.headers.get("content-type") ?? "application/json",
-        };
-        const retryAfter = response.headers.get("retry-after");
-        if (retryAfter) headers["Retry-After"] = retryAfter;
-        return new Response(response.body, { status: response.status, headers });
-      } catch (err) {
-        return err instanceof Error && err.name === "TimeoutError"
-          ? error(504, "DV Live API request timed out.")
-          : error(502, "DV Live API is unreachable.");
-      }
+      api = new ApiService({
+        environment: DVLIVE_ENV,
+        logEnable: DVLIVE_LOG_ENABLE,
+        logLevel: DVLIVE_LOG_LEVEL,
+        headers: () => ({ Authorization: `Bearer ${DVLIVE_API_TOKEN}` }),
+      });
     } catch (err) {
-      if (err instanceof InputError) return error(err.status, err.message, err.headers);
-      return error(500, "Internal DVLive error.");
+      console.error(`${TAG} ${ts} | invalid SDK config:`, err instanceof Error ? err.message : err);
+      return fail(500, "Invalid DVLive SDK configuration.", "SERVER_MISCONFIGURED");
     }
-  };
-}
 
-export const handleRequest = createHandler({ env: (name) => Deno.env.get(name) });
-
-if (typeof Deno !== "undefined") {
-  Deno.serve(handleRequest);
-}
+    console.log(
+      `${TAG} ${ts} | mode=${mode}${needsUser ? ` user=${userRef.slice(0, 4)}***` : ""}`,
+    );
+    const result = await callApi(api, mode, url.searchParams, body, userRef);
+    return ok(result.data, result.status);
+  } catch (err) {
+    if (err instanceof InputError) {
+      return fail(err.status, err.message, err.code, undefined, err.headers);
+    }
+    if (err instanceof ApiValidationError) {
+      return fail(400, err.message, "VALIDATION");
+    }
+    if (err instanceof ApiHttpError) {
+      if (err.document !== undefined) {
+        return fail(err.status, "DV Live upstream error.", "UPSTREAM_ERROR", err.document);
+      }
+      return fail(err.status, err.bodyText || "DV Live upstream error.", "UPSTREAM_ERROR");
+    }
+    if (err instanceof ApiRequestError) {
+      return fail(
+        err.kind === "timeout" ? 504 : 502,
+        err.message,
+        err.kind === "timeout" ? "UPSTREAM_TIMEOUT" : "UPSTREAM_ERROR",
+      );
+    }
+    if (err instanceof ApiResponseError) {
+      return fail(502, err.message, "UPSTREAM_ERROR");
+    }
+    console.error(`${TAG} ${ts} | unexpected:`, err instanceof Error ? err.message : err);
+    return fail(500, "Internal DVLive error.", "INTERNAL_ERROR");
+  }
+});

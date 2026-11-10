@@ -2,8 +2,7 @@
 set -euo pipefail
 
 # Local configuration: edit the defaults after :- below; no export is needed.
-SHOW_VOTE_UUID="${SHOW_VOTE_UUID:-00000000-0000-4000-8000-000000000001}"
-USER_REF="${USER_REF:-dvlive-smoke}"
+SHOW_VOTE_UUID="${SHOW_VOTE_UUID:-11111111-1111-4111-8111-111111111101}"
 CHOICE_UUID="${CHOICE_UUID:-22222222-2222-4222-8222-222222222201}"
 VOTES="${VOTES:-}"
 SESSION_TOKEN="${SESSION_TOKEN:-}"
@@ -11,13 +10,14 @@ PHONE_FINGER_PRINT="${PHONE_FINGER_PRINT:-}"
 IP="${IP:-}"
 USER_AGENT="${USER_AGENT:-}"
 UNIQ_SUBSCRIPTION_ID="${UNIQ_SUBSCRIPTION_ID:-}"
-EXPECTED_STATUS="${EXPECTED_STATUS:-200}"
+EXPECTED_STATUS="${EXPECTED_STATUS:-201}"
 OUT_FILE="${OUT_FILE:-}"
 
-source "$(cd "$(dirname "$0")" && pwd)/smoke-dvlive-common.sh"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/smoke-dvlive-common.sh"
+
 
 # Casts votes for the configured voter; VOTES can override the default single vote.
-PARAMS=$(jq -n --arg show "$SHOW_VOTE_UUID" --arg user "$USER_REF" '{showVoteUuid:$show,userRef:$user}')
+PARAMS=$(jq -n --arg show "$SHOW_VOTE_UUID" '{showVoteUuid:$show}')
 DEFAULT_VOTES=$(jq -n --arg choice "$CHOICE_UUID" '[{choiceUuid:$choice,nbVotes:1}]')
 VOTE_LIST=${VOTES:-$DEFAULT_VOTES}
 jq -e 'type == "array" and length > 0 and all(.[]; (.choiceUuid | type == "string" and length > 0) and (.nbVotes | type == "number" and . > 0 and floor == .))' <<<"$VOTE_LIST" >/dev/null || {

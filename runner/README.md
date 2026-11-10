@@ -37,7 +37,6 @@ npm run getShowVoteChoice  # GET  /show-vote-choice/{uuid}
 npm run getShowVote        # GET  /show-vote/{uuid}
 npm run createVoter        # POST /show-vote/{uuid}/voter
 npm run getVoter           # GET  /show-vote/{uuid}/voter/{userRef}
-npm run addVote            # POST .../add-vote
 npm run castVote           # POST .../vote
 
 npm start                  # uses config.action
@@ -62,10 +61,6 @@ Each run prints the call signature, the full JSON response, and a short summary 
 | `createVoter.uniqRef` | string | no | Request body. |
 | `getVoter.showVoteUuid` | string | yes for `getVoter` | Path UUID. |
 | `getVoter.userRef` | string | yes for `getVoter` | Voter uniqRef (path). |
-| `addVote.showVoteUuid` | string | yes for `addVote` | Path UUID. |
-| `addVote.userRef` | string | yes for `addVote` | Voter uniqRef (path). |
-| `addVote.additionalVoteType` | string | no | Body (`VIDEO`, `PURCHASE`, …). |
-| `addVote.nbPoints` | integer | no | Body. |
 | `castVote.showVoteUuid` | string | yes for `castVote` | Path UUID. |
 | `castVote.userRef` | string | yes for `castVote` | Voter uniqRef (path). |
 | `castVote.votes` | array | yes for `castVote` | Body: `{ choiceUuid, nbVotes }[]`. |
@@ -85,7 +80,6 @@ For POST actions, path fields (`showVoteUuid`, `userRef`) are stripped from the 
 | `getShowVote` | `GET /show-vote/{uuid}` | `client.showVotes.get(uuid)` |
 | `createVoter` | `POST /show-vote/{uuid}/voter` | `client.voters.create(showVoteUuid, body)` |
 | `getVoter` | `GET /show-vote/{uuid}/voter/{userRef}` | `client.voters.get(showVoteUuid, userRef)` |
-| `addVote` | `POST .../add-vote` | `client.voters.addVote(showVoteUuid, uniqRef, body)` |
 | `castVote` | `POST .../vote` | `client.voters.castVote(showVoteUuid, uniqRef, body)` |
 
 ## Files
@@ -96,3 +90,6 @@ For POST actions, path fields (`showVoteUuid`, `userRef`) are stripped from the 
 - `openapi.json` — OpenAPI spec.
 - `config.example.json` — template configuration.
 - `config.json` — real configuration; **gitignored** (may contain tokens).
+
+For vote crediting, use the standalone `../script/smoke-add-vote.sh` direct-curl smoke test.
+The upstream OpenAPI retains the endpoint for reference.
