@@ -192,9 +192,9 @@ di testarli anche contro ambienti che restituiscono uno status differente.
 I test dell'SDK rimangono separati e usano risposte HTTP simulate:
 
 ```sh
-npm ci --prefix supabase/functions/_shared/sdk
-npm --prefix supabase/functions/_shared/sdk run check
-npm --prefix supabase/functions/_shared/sdk test
+npm ci --prefix supabase/functions/_shared/dvlive-sdk
+npm --prefix supabase/functions/_shared/dvlive-sdk run check
+npm --prefix supabase/functions/_shared/dvlive-sdk test
 ```
 
 Per abilitare il logger dell’SDK nella Edge Function, impostare in `supabase/.env`

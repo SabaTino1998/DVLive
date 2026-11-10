@@ -23,7 +23,7 @@ logic reusable across projects rather than implementing it in the Edge Function.
 ## SDK dependency
 
 Explicit user instruction: the DVLive SDK has no published npm version.
-Preserve the existing local mapping `../_shared/sdk/src/index.ts` and the
+Preserve the existing local mapping `../_shared/dvlive-sdk/src/index.ts` and the
 public import `@digitalvirgo/dvlive-api`. Do not modify the SDK for auth changes.
 
 The user requires `bolt-auth-proxy/index.ts`, its `deno.json`, and
@@ -117,7 +117,7 @@ Missing or unsupported modes must still return the catalog before reading
 logging configuration or constructing `ApiService`. Verify disabled defaults,
 WARNING as the default enabled level, level filtering, credential redaction,
 and environment forwarding with mocked SDK/adapter tests. See
-[SDK logging](functions/_shared/sdk/README.md#logging) for the public configuration contract.
+[SDK logging](functions/_shared/dvlive-sdk/README.md#logging) for the public configuration contract.
 
 ## Modes and HTTP input
 

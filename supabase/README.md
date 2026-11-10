@@ -23,14 +23,17 @@ Identifiers must also be passed in the query string.
 | --- | --- | --- | --- | --- |
 | `getShowVote` | GET | `uuid` | — | Show name and dates, current round, and participants |
 | `getShowVoteChoice` | GET | `uuid` | — | Participant details, status, images, and rounds |
-| `getVoter` | GET | `showVoteUuid`, `userRef` | — | Voter details, balance, and fraud status |
-| `createVoter` | POST | `showVoteUuid` | Optional fields: `email`, `phone`, `uniqRef` | Registration result |
-| `castVote` | POST | `showVoteUuid`, `userRef` | Required `votes`; optional fraud prevention fields | Voting result and `nbVoteRemaining`, when provided |
+| `getVoter` | GET | `showVoteUuid` | — | Voter details, balance, and fraud status |
+| `createVoter` | POST | `showVoteUuid` | Optional fields: `email`, `phone` | Registration result |
+| `castVote` | POST | `showVoteUuid` | Required `votes`; optional fraud prevention fields | Voting result and `nbVoteRemaining`, when provided |
 
 For `getShowVote`, `uuid` identifies the show vote; for `getShowVoteChoice`,
-it identifies the participant. `userRef` is the voter reference.
-The function receives these values from the caller: it does not automatically
-retrieve the show UUID or manage its lifecycle across rounds.
+it identifies the participant. Callers do not send `userRef` or `uniqRef`.
+For `getVoter`, `createVoter`, and `castVote`, the function takes voter identity
+from the verified app JWT claim `absolute_reference` (flat or in `app_metadata`).
+`sub` is the internal profile UUID. Caller references cannot override that identity.
+The function does not automatically retrieve the show UUID or manage its lifecycle
+across rounds.
 
 `votes` must be a non-empty array of objects such as
 `{ "choiceUuid": "PARTICIPANT_UUID", "nbVotes": 1 }`.
@@ -43,7 +46,7 @@ additional ones.
 
 If `mode` is missing, empty, or unknown, the function returns HTTP 200 with the
 SDK operation catalog, including for POST requests. The catalog does not require
-a DV Live token, a JSON body, or environment configuration.
+an app JWT, a DV Live token, a JSON body, or environment configuration.
 
 Vote crediting through `add-vote` is not exposed by this function; the corresponding
 [smoke script](../script/README.md) calls DV Live directly.
@@ -53,24 +56,31 @@ Vote crediting through `add-vote` is not exposed by this function; the correspon
 Every request for a recognized operation must include:
 
 ```http
-bearer-token: <dv-live-token>
+Authorization: Bearer <app access_token>
+apikey: <supabase-anon-or-publishable-key>
 ```
 
-The value must contain only the token, without the `Bearer` prefix. The function
-forwards it to the DV Live API as `Authorization: Bearer <dv-live-token>`, keeping
-it local to each request. Do not put this token in `supabase/.env`.
-The function does not issue, retrieve, or refresh DV Live tokens.
+The app JWT is issued by `bolt-auth-proxy` after SmartUser login/signup and
+`syncUser`. The function verifies the HS256 signature with `APP_JWT_SECRET`
+(fallback `SUPABASE_JWT_SECRET`), and requires `app_role=app_user` and a
+nonempty `absolute_reference`. Missing or invalid JWT returns `AUTH_REQUIRED`
+(401). Invalid app claims or a missing `absolute_reference` return `FORBIDDEN`
+(403).
 
-Supabase authentication is separate: the caller's `Authorization` header is not
-used as the DV Live token. Currently, [config.toml](config.toml) sets
-`verify_jwt = false`, so the gateway does not verify the JWT for this function.
-For requests to a remote project, use the Supabase headers required by the
-gateway and the project's key type.
+The DV Live upstream token is the server secret `DVLIVE_API_TOKEN` in
+`supabase/.env` (no `Bearer` prefix). The function attaches it as
+`Authorization: Bearer <token>` on upstream SDK calls. Callers never send
+`bearer-token` or the DV Live token. Never expose `DVLIVE_API_TOKEN` to app clients.
+
+Supabase gateway authentication is separate. Currently, [config.toml](config.toml)
+sets `verify_jwt = false` for this function. For requests to a remote project,
+still send the Supabase headers required by the gateway and the project's key type.
 
 ## Local examples
 
-The following commands assume that `DVLIVE_BEARER_TOKEN` is already set in the
-shell. Replace placeholder identifiers with values from your test environment.
+The following commands assume that `$SUPABASE_JWT` (app access token) and
+`$SUPABASE_ANON_KEY` are already set in the shell. Replace placeholder
+identifiers with values from your test environment.
 
 ```sh
 # Operation catalog
@@ -78,17 +88,20 @@ curl 'http://127.0.0.1:54321/functions/v1/dvlive'
 
 # Show and current round
 curl 'http://127.0.0.1:54321/functions/v1/dvlive?mode=getShowVote&uuid=SHOW_UUID' \
-  -H "bearer-token: $DVLIVE_BEARER_TOKEN"
+  -H "Authorization: Bearer $SUPABASE_JWT" \
+  -H "apikey: $SUPABASE_ANON_KEY"
 
 # Register a voter
 curl 'http://127.0.0.1:54321/functions/v1/dvlive?mode=createVoter&showVoteUuid=SHOW_UUID' \
-  -H "bearer-token: $DVLIVE_BEARER_TOKEN" \
+  -H "Authorization: Bearer $SUPABASE_JWT" \
+  -H "apikey: $SUPABASE_ANON_KEY" \
   -H 'Content-Type: application/json' \
-  --data '{"uniqRef":"VOTER_REF"}'
+  --data '{"email":"voter@example.com"}'
 
 # Cast a vote
-curl 'http://127.0.0.1:54321/functions/v1/dvlive?mode=castVote&showVoteUuid=SHOW_UUID&userRef=VOTER_REF' \
-  -H "bearer-token: $DVLIVE_BEARER_TOKEN" \
+curl 'http://127.0.0.1:54321/functions/v1/dvlive?mode=castVote&showVoteUuid=SHOW_UUID' \
+  -H "Authorization: Bearer $SUPABASE_JWT" \
+  -H "apikey: $SUPABASE_ANON_KEY" \
   -H 'Content-Type: application/json' \
   --data '{"votes":[{"choiceUuid":"CHOICE_UUID","nbVotes":1}]}'
 ```
@@ -103,19 +116,21 @@ If `supabase/.env` does not exist, create it by copying
 
 ```dotenv
 DVLIVE_ENV=STAG
+DVLIVE_API_TOKEN=<server-only-dvlive-api-token>
 DVLIVE_LOG_ENABLE=FALSE
 DVLIVE_LOG_LEVEL=WARNING
 ```
 
 - `DVLIVE_ENV`: `STAG` or `PROD`. The SDK selects the corresponding DV Live URL;
   a missing or unsupported value produces HTTP 500 for operation requests.
+- `DVLIVE_API_TOKEN`: server-only DV Live API token, without a `Bearer` prefix.
 - `DVLIVE_LOG_ENABLE`: `TRUE` enables SDK logging; the default is `FALSE`.
 - `DVLIVE_LOG_LEVEL`: `WARNING`, `INFO`, or `DEBUG`; the default is `WARNING`.
   The level is ignored when logging is disabled.
 
 ```sh
 supabase start
-supabase functions serve dvlive --env-file supabase/.env
+supabase functions serve --env-file supabase/.env
 ```
 
 Logs appear in the local server terminal or, after deployment, in the function
@@ -124,8 +139,8 @@ logs in the Supabase dashboard. `INFO` adds request details and durations;
 and redacts sensitive data. Restart the server after changing the `.env` file.
 
 The mapping in [deno.json](functions/dvlive/deno.json) points to
-`../_shared/sdk/src/index.ts`. The SDK lives in
-[`functions/_shared/sdk`](functions/_shared/sdk), alongside the Edge Functions,
+`../_shared/dvlive-sdk/src/index.ts`. The SDK lives in
+[`functions/_shared/dvlive-sdk`](functions/_shared/dvlive-sdk), alongside the Edge Functions,
 so local serving and deployment use the shared source without npm publication
 or a prebuilt `dist/` directory.
 
@@ -139,32 +154,32 @@ supabase functions deploy dvlive --project-ref PROJECT_REF
 ```
 
 The file passed to `secrets set` must contain the server configuration described
-above, without the caller's DV Live token. Deployment uses the gateway
+above, including `DVLIVE_API_TOKEN`. Deployment uses the gateway
 configuration in [config.toml](config.toml) and the actual SDK mapping in `deno.json`.
 
 ## Responses and errors
 
-Successful responses contain the public model returned by the SDK
-(`result.data`) directly, without an additional wrapper, and preserve the DV Live
-HTTP status.
+Successful responses wrap the public model returned by the SDK in
+`{ "ok": true, "data": ... }` and preserve the DV Live HTTP status.
+Errors use `{ "ok": false, "error": { "message", "code", "details" } }`.
 
 | Status | Meaning |
 | --- | --- |
 | `200` | Catalog; operation responses preserve the upstream success status |
-| `204` | CORS preflight (`OPTIONS`) |
+| `200` | CORS preflight (`OPTIONS`) |
 | `400` | Malformed JSON or parameter/body validation error |
-| `401` | Missing or empty `bearer-token` header, or upstream authentication error |
+| `401` | Missing or invalid app JWT (`AUTH_REQUIRED`) |
+| `403` | Invalid app claims or missing `absolute_reference` (`FORBIDDEN`) |
 | `405` | Incorrect method for the mode; the response includes `Allow` |
 | `415` | Unsupported content type for a POST request |
-| `500` | Invalid SDK configuration or unexpected internal error |
+| `500` | Missing or invalid SDK configuration (`SERVER_MISCONFIGURED`) or unexpected internal error |
 | `502` | Network error or DV Live response decoding failure |
 | `504` | DV Live request timeout |
 
-HTTP errors returned by DV Live retain their original status and payload,
-including text payloads. Errors generated by the adapter have the form
-`{ "status": "error", "code": 400, "message": "..." }`.
-All responses include CORS headers; origin `*` and methods `GET`, `POST`, and
-`OPTIONS` are allowed. No automatic retries are performed.
+HTTP errors returned by DV Live retain their original status, with upstream
+payloads in `error.details` when available. All responses include CORS headers;
+origin `*` and methods `GET`, `POST`, and `OPTIONS` are allowed. No automatic
+retries are performed.
 
 ## Files and verification
 
@@ -175,4 +190,4 @@ All responses include CORS headers; origin `*` and methods `GET`, `POST`, and
 
 To verify individual operations against a running function, configure and run
 the [smoke tests](../script/README.md). SDK tests using mocked HTTP responses are
-described in the [SDK README](functions/_shared/sdk/README.md).
+described in the [SDK README](functions/_shared/dvlive-sdk/README.md).

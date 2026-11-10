@@ -315,19 +315,21 @@ an HTTP request is not part of the transport log.
 
 ## Supabase integration
 
-The Edge Function maps the package name to `supabase/functions/_shared/sdk/src/index.ts` through its
+The Edge Function maps the package name to `supabase/functions/_shared/dvlive-sdk/src/index.ts` through its
 `deno.json`, so local serving and deployment do not require npm publication or a
 prebuilt `dist/`. Set the Supabase environment file to:
 
 ```dotenv
 DVLIVE_ENV=STAG
+DVLIVE_API_TOKEN=<server-only-dvlive-api-token>
 ```
 
-The Edge Function passes `DVLIVE_ENV` directly as `environment` to the SDK along
-with the caller's `bearer-token`. Only the SDK validates supported environment values. It does not
-know the upstream base URLs. Missing or invalid configuration returns HTTP 500,
-while the mode catalog remains available. The SDK does not read `.env` or cache
-authentication.
+The Edge Function passes `DVLIVE_ENV` directly as `environment` to the SDK and
+supplies `Authorization: Bearer` from the server secret `DVLIVE_API_TOKEN`.
+Callers do not send `bearer-token` or the DV Live token. Only the SDK validates
+supported environment values and selects the upstream base URL. Missing or
+invalid configuration returns HTTP 500, while the mode catalog remains available.
+The SDK does not read `.env` or cache authentication.
 
 The Edge Function handles HTTP method, query and header extraction, content type
 and JSON parsing, then passes path values and raw JSON to the SDK service. Its HTTP query parameters
@@ -348,9 +350,9 @@ the development or verification commands below.
 From the repository root (Node.js >=22.18 for development tests):
 
 ```sh
-npm ci --prefix supabase/functions/_shared/sdk
-npm --prefix supabase/functions/_shared/sdk run check
-npm --prefix supabase/functions/_shared/sdk test
+npm ci --prefix supabase/functions/_shared/dvlive-sdk
+npm --prefix supabase/functions/_shared/dvlive-sdk run check
+npm --prefix supabase/functions/_shared/dvlive-sdk test
 ```
 
 `check` checks source types, the public method contracts and the Edge Function.
@@ -363,8 +365,8 @@ Verify the Edge Function separately by running the relevant smoke script for eac
 operation against an active local or remote function; see `script/README.md`.
 
 ```sh
-npm --prefix supabase/functions/_shared/sdk run build
-npm pack ./supabase/functions/_shared/sdk --dry-run
+npm --prefix supabase/functions/_shared/dvlive-sdk run build
+npm pack ./supabase/functions/_shared/dvlive-sdk --dry-run
 ```
 
 The package exports only its root API. Published artifacts include `dist/` and
