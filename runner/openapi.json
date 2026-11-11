@@ -38,7 +38,7 @@
                         }
                     },
                     "401": {
-                        "description": "Missing or invalid bearer token",
+                        "description": "Missing or invalid X-Internal-Auth token",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -66,7 +66,7 @@
                 },
                 "security": [
                     {
-                        "bearerAuth": []
+                        "internalAuth": []
                     }
                 ]
             }
@@ -103,7 +103,7 @@
                         }
                     },
                     "401": {
-                        "description": "Missing or invalid bearer token",
+                        "description": "Missing or invalid X-Internal-Auth token",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -131,7 +131,7 @@
                 },
                 "security": [
                     {
-                        "bearerAuth": []
+                        "internalAuth": []
                     }
                 ]
             }
@@ -188,7 +188,7 @@
                         }
                     },
                     "401": {
-                        "description": "Missing or invalid bearer token",
+                        "description": "Missing or invalid X-Internal-Auth token",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -246,7 +246,7 @@
                 },
                 "security": [
                     {
-                        "bearerAuth": []
+                        "internalAuth": []
                     }
                 ]
             }
@@ -291,7 +291,7 @@
                         }
                     },
                     "401": {
-                        "description": "Missing or invalid bearer token",
+                        "description": "Missing or invalid X-Internal-Auth token",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -339,7 +339,7 @@
                 },
                 "security": [
                     {
-                        "bearerAuth": []
+                        "internalAuth": []
                     }
                 ]
             }
@@ -432,7 +432,7 @@
                         }
                     },
                     "401": {
-                        "description": "Missing or invalid bearer token",
+                        "description": "Missing or invalid X-Internal-Auth token",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -518,7 +518,7 @@
                 },
                 "security": [
                     {
-                        "bearerAuth": []
+                        "internalAuth": []
                     }
                 ]
             }
@@ -611,7 +611,7 @@
                         }
                     },
                     "401": {
-                        "description": "Missing or invalid bearer token",
+                        "description": "Missing or invalid X-Internal-Auth token",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -697,7 +697,7 @@
                 },
                 "security": [
                     {
-                        "bearerAuth": []
+                        "internalAuth": []
                     }
                 ]
             }
@@ -1101,9 +1101,11 @@
             }
         },
         "securitySchemes": {
-            "bearerAuth": {
-                "type": "http",
-                "scheme": "bearer"
+            "internalAuth": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "X-Internal-Auth",
+                "description": "Environment-specific token for external ALB access; not required for internal AWS hosts."
             }
         }
     },

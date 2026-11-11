@@ -7,10 +7,15 @@
 
 ## Authentication
 
-- **Type:** HTTP Bearer
-- **Header:** `Authorization: Bearer <token>`
+- **Type:** environment-specific ALB token for external access
+- **Header:** `X-Internal-Auth: <token>`
 
-All documented endpoints require `bearerAuth`.
+`DVLIVE_MODE=PROD` (also the default when absent) selects the external host and
+`DVLIVE_ALB_TOKEN_<environment>` using `DVLIVE_ENV` (`DEV`, `STAG`, `PROD`).
+`DVLIVE_MODE=LOCAL` selects the same environment with an `int-` host prefix and
+sends only `Authorization: Bearer dev-auth-token`, ignoring ALB tokens.
+External access currently
+allows GET and HEAD; POST operations require an ALB rule update.
 
 ---
 

@@ -128,7 +128,7 @@ function printHelpDetail(name) {
   console.log(`Client:  ${entry.client}`);
   console.log('\nRequired config:');
   if (entry.config.length === 0) {
-    console.log('  (none beyond baseUrl and bearerToken)');
+    console.log('  (none beyond DVLIVE_MODE, DVLIVE_ENV and its mode-specific authentication)');
   } else {
     for (const key of entry.config) console.log(`  ${key}`);
   }
@@ -184,8 +184,13 @@ function loadConfig() {
   } catch (err) {
     throw new Error(`config.json is not valid JSON: ${err.message}`);
   }
-  if (!cfg.baseUrl || typeof cfg.baseUrl !== 'string') {
-    throw new Error('config.baseUrl must be a non-empty string');
+  cfg.DVLIVE_MODE = (process.env.DVLIVE_MODE ?? cfg.DVLIVE_MODE ?? 'PROD').trim();
+  if (!['LOCAL', 'PROD'].includes(cfg.DVLIVE_MODE)) {
+    throw new Error('config.DVLIVE_MODE must be LOCAL or PROD');
+  }
+  cfg.DVLIVE_ENV = (process.env.DVLIVE_ENV ?? cfg.DVLIVE_ENV)?.trim();
+  if (!['DEV', 'STAG', 'PROD'].includes(cfg.DVLIVE_ENV)) {
+    throw new Error('config.DVLIVE_ENV must be DEV, STAG or PROD');
   }
   return cfg;
 }
@@ -359,7 +364,7 @@ function reportError(err) {
       console.error(`  body       : ${bodyStr}`);
     }
     if (err instanceof DvliveAuthError) {
-      console.error('  → Check bearerToken in config.json.');
+      console.error('  → Check DVLIVE_MODE and, in PROD mode, DVLIVE_ALB_TOKEN_<environment> in config.json or the environment.');
     }
     if (
       err instanceof DvliveConflictError &&
@@ -386,18 +391,20 @@ async function main() {
   const cfg = loadConfig();
   const action = resolveAction(cfg);
 
+  const tokenKey = `DVLIVE_ALB_TOKEN_${cfg.DVLIVE_ENV}`;
+  const albToken = cfg.DVLIVE_MODE === 'LOCAL'
+    ? undefined
+    : (process.env[tokenKey] ?? cfg[tokenKey])?.trim() || undefined;
+  const client = new DvliveClient({ environment: cfg.DVLIVE_ENV, mode: cfg.DVLIVE_MODE, albToken });
+
   console.log('DV Live web show engine — reference runner');
-  console.log(`  baseUrl : ${cfg.baseUrl}`);
+  console.log(`  mode    : ${cfg.DVLIVE_MODE}`);
+  console.log(`  baseUrl : ${client.baseUrl}`);
   console.log(
-    `  auth    : ${cfg.bearerToken ? 'Bearer (token set)' : '(none — likely 401)'}`,
+    `  auth    : ${cfg.DVLIVE_MODE === 'LOCAL' ? 'Bearer dev-auth-token' : albToken ? 'X-Internal-Auth (token set)' : '(none)'}`,
   );
   console.log(`  action  : ${action}`);
   console.log('');
-
-  const client = new DvliveClient({
-    baseUrl: cfg.baseUrl,
-    bearerToken: cfg.bearerToken,
-  });
 
   switch (action) {
     case 'getShowVoteChoice':

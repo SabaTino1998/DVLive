@@ -9,7 +9,7 @@ import type { Choice } from '../src/types';
 export const colors = { paper: '#f6f7f9', ink: '#172033', muted: '#667085', line: '#e4e7ec', blue: '#315de7', pale: '#f0f3f9', green: '#4b694a', orange: '#aa6244' };
 export const errorMessage = (error: unknown) => error instanceof Error ? error.message : 'Connection failed. Please try again.';
 export const formatVotes = (value: number) => new Intl.NumberFormat('en-US').format(value);
-export const statusLabel = (value: string) => value === 'PRESENT' ? 'PRESENT' : value === 'EVICTED' ? 'EVICTED' : value;
+export const statusLabel = (value: string, isNominated?: boolean) => isNominated === true ? 'NOMINATED' : value;
 export function Logo({ light = false }: { light?: boolean }) { return <Text style={[s.logo, light && { color: '#fff' }]}>DV<Text style={{ color: colors.blue }}>Live</Text></Text>; }
 export function Eyebrow({ children, light = false }: { children: ReactNode; light?: boolean }) { return <Text style={[s.eyebrow, light && { color: '#c5d3be' }]}>{children}</Text>; }
 export function Action({ children, onPress, disabled, secondary = false }: { children: ReactNode; onPress: () => void; disabled?: boolean; secondary?: boolean }) {
@@ -17,7 +17,7 @@ export function Action({ children, onPress, disabled, secondary = false }: { chi
 }
 export function Notice({ children, retry }: { children: ReactNode; retry?: () => void }) { return <View accessibilityRole="alert" style={s.notice}><Text style={s.noticeText}>{children}</Text>{retry && <Pressable accessibilityRole="button" onPress={retry}><Text style={s.retry}>Try again ↻</Text></Pressable>}</View>; }
 export function Loading({ label = 'Loading…' }: { label?: string }) { return <View style={s.loading}><ActivityIndicator color={colors.blue} /><Text style={s.muted}>{label}</Text></View>; }
-export function Status({ value }: { value: string }) { return <Text style={[s.status, { color: value === 'PRESENT' ? colors.green : colors.orange }]}>●  {statusLabel(value)}</Text>; }
+export function Status({ value, isNominated }: { value: string; isNominated?: boolean }) { return <Text style={[s.status, { color: isNominated === true ? colors.blue : value === 'PRESENT' ? colors.green : colors.orange }]}>●  {statusLabel(value, isNominated)}</Text>; }
 export function Portrait({ choice, large = false }: { choice: Choice; large?: boolean }) {
   const [failed, setFailed] = useState(false);
   const uri = large ? choice.desktopPicture || choice.mobilePicture : choice.mobilePicture || choice.desktopPicture;

@@ -1,26 +1,23 @@
-type ApiEnvironment = "STAG" | "PROD";
-
-export type AlbTokenSlot = "dev" | "stag" | "prod";
+export type ApiEnvironment = "DEV" | "STAG" | "PROD";
 
 const BASE_URLS: Readonly<Record<ApiEnvironment, string>> = {
-  STAG: "https://dev-webshow-engine.dv-live.com",
+  DEV: "https://dev-webshow-engine.dv-live.com",
+  STAG: "https://stag-webshow-engine.dv-live.com",
   PROD: "https://webshow-engine.dv-live.com",
 };
 
-const ALB_TOKEN_HOSTS: Readonly<Record<string, AlbTokenSlot>> = {
-  "dev-webshow-engine.dv-live.com": "dev",
-  "stag-webshow-engine.dv-live.com": "stag",
-  "webshow-engine.dv-live.com": "prod",
+const LOCAL_BASE_URLS: Readonly<Record<ApiEnvironment, string>> = {
+  DEV: "https://int-dev-webshow-engine.dv-live.com",
+  STAG: "https://int-stag-webshow-engine.dv-live.com",
+  PROD: "https://int-webshow-engine.dv-live.com",
 };
 
-export function resolveBaseUrl(environment: string | undefined): string {
-  if (environment !== "STAG" && environment !== "PROD") {
-    throw new TypeError('environment must be "STAG" or "PROD".');
+export function resolveBaseUrl(environment: string | undefined, mode: string = "PROD"): string {
+  if (mode !== "LOCAL" && mode !== "PROD") {
+    throw new TypeError('mode must be "LOCAL" or "PROD".');
   }
-  return BASE_URLS[environment];
-}
-
-/** Returns the ALB token slot for a request host, or undefined when the host is unknown. */
-export function resolveAlbTokenSlot(hostname: string): AlbTokenSlot | undefined {
-  return ALB_TOKEN_HOSTS[hostname];
+  if (environment !== "DEV" && environment !== "STAG" && environment !== "PROD") {
+    throw new TypeError('environment must be "DEV", "STAG" or "PROD".');
+  }
+  return (mode === "LOCAL" ? LOCAL_BASE_URLS : BASE_URLS)[environment];
 }

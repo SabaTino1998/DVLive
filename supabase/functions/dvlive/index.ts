@@ -8,7 +8,6 @@ import {
   ApiModes,
   API_MODES,
   parseMode,
-  type AlbTokens,
   type ApiModeDefinition,
   type ApiResult,
   type ApiResponse,
@@ -69,17 +68,6 @@ class InputError extends Error {
 
 function trimSecret(value: string | undefined): string {
   return value?.trim() ?? "";
-}
-
-function readAlbTokens(env: HandlerOptions["env"]): AlbTokens {
-  const tokens: AlbTokens = {};
-  const dev = trimSecret(env("DVLIVE_ALB_TOKEN_DEV"));
-  const stag = trimSecret(env("DVLIVE_ALB_TOKEN_STAG"));
-  const prod = trimSecret(env("DVLIVE_ALB_TOKEN_PROD"));
-  if (dev) tokens.dev = dev;
-  if (stag) tokens.stag = stag;
-  if (prod) tokens.prod = prod;
-  return tokens;
 }
 
 async function parseRequestBody(req: Request, action: ApiModeDefinition, mode: ApiModes): Promise<unknown> {
@@ -199,20 +187,25 @@ async function handleRequestWithEnv(
       return fail(403, "Missing absolute_reference claim.", "FORBIDDEN");
     }
 
-    const dvliveApiToken = trimSecret(env("DVLIVE_API_TOKEN"));
-    if (!dvliveApiToken || !dvliveEnv) {
-      console.error(`${tag} ${ts} | missing DVLIVE_API_TOKEN or DVLIVE_ENV`);
-      return fail(500, "DVLive is not configured.", "SERVER_MISCONFIGURED");
-    }
+    const dvliveMode = env("DVLIVE_MODE")?.trim() ?? "PROD";
+    const albToken = dvliveMode === "LOCAL"
+      ? undefined
+      : trimSecret(env(`DVLIVE_ALB_TOKEN_${dvliveEnv}`)) || undefined;
 
     let api: ApiService;
     try {
+      const localToken = dvliveMode === "LOCAL" ? trimSecret(env("LOCAL_DVLIVE_API_TOKEN")) : undefined;
+      if (dvliveMode === "LOCAL" && !localToken) {
+        throw new TypeError("LOCAL_DVLIVE_API_TOKEN is required in LOCAL mode.");
+      }
       api = new ApiService({
         environment: dvliveEnv,
+        mode: dvliveMode,
         logEnable: env("DVLIVE_LOG_ENABLE"),
         logLevel: env("DVLIVE_LOG_LEVEL"),
-        albTokens: readAlbTokens(env),
-        headers: () => ({ Authorization: `Bearer ${dvliveApiToken}` }),
+        headers: dvliveMode === "LOCAL"
+          ? { Authorization: `Bearer ${localToken}` }
+          : albToken ? { "X-Internal-Auth": albToken } : undefined,
       });
     } catch (err) {
       console.error(`${tag} ${ts} | invalid SDK config:`, err instanceof Error ? err.message : err);

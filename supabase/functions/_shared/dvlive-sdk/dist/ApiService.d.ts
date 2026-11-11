@@ -1,15 +1,13 @@
-import { type AlbTokenSlot } from "./environment.ts";
 import { ApiResponse } from "./models/api-response.ts";
 import { ShowVote } from "./models/show-vote.ts";
 import { ShowVoteChoice } from "./models/show-vote-choice.ts";
 import { CastVoteResult, CreateVoterResult, Voter } from "./models/voter.ts";
 import type { GetVoterInput, CreateVoterInput, CastVoteInput } from "./requests/voter.ts";
-export type AlbTokens = Partial<Record<AlbTokenSlot, string>>;
 export interface ApiServiceConfig {
     environment: string | undefined;
+    /** LOCAL uses internal hosts; PROD (default) uses external hosts. */
+    mode?: string;
     headers?: Record<string, string> | (() => Record<string, string>);
-    /** Optional ALB tokens keyed by host slot. Non-blank values set X-Internal-Auth. */
-    albTokens?: AlbTokens;
     timeoutMs?: number;
     /** Accepts TRUE/FALSE environment strings or booleans. Defaults to false. */
     logEnable?: boolean | string;
@@ -19,7 +17,6 @@ export interface ApiServiceConfig {
 export declare class ApiService {
     private readonly url;
     private readonly extraHeaders;
-    private readonly albTokens;
     private readonly timeoutMs;
     private readonly logger;
     constructor(config: ApiServiceConfig);
@@ -29,7 +26,6 @@ export declare class ApiService {
     getVoter(input: GetVoterInput): Promise<ApiResponse<Voter>>;
     castVote(...args: [input: CastVoteInput] | [input: Pick<CastVoteInput, "showVoteUuid" | "userRef">, body: unknown]): Promise<ApiResponse<CastVoteResult>>;
     private voterPath;
-    private albAuthHeader;
     private request;
 }
 //# sourceMappingURL=ApiService.d.ts.map

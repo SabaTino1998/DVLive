@@ -68,6 +68,7 @@ export class Choice {
 }
 
 export class ShowVoteChoice {
+  declare readonly isNominated?: boolean;
   declare readonly bio?: string | null;
   declare readonly desktopPicture?: string | null;
   declare readonly mobilePicture?: string | null;
@@ -86,12 +87,14 @@ export class ShowVoteChoice {
     mobilePicture?: string | null,
     eliminatedRound?: EliminatedRound | null,
     reintroducedRound?: ReintroducedRound | null,
+    isNominated?: boolean,
   ) {
     if (bio !== undefined) this.bio = bio;
     if (desktopPicture !== undefined) this.desktopPicture = desktopPicture;
     if (mobilePicture !== undefined) this.mobilePicture = mobilePicture;
     if (eliminatedRound !== undefined) this.eliminatedRound = eliminatedRound;
     if (reintroducedRound !== undefined) this.reintroducedRound = reintroducedRound;
+    if (isNominated !== undefined) this.isNominated = isNominated;
   }
 
   static fromResponse(response: ShowVoteChoiceResponse): ShowVoteChoice {
@@ -107,6 +110,7 @@ export class ShowVoteChoice {
       response.mobilePicture,
       response.eliminatedRound == null ? response.eliminatedRound : EliminatedRound.fromResponse(response.eliminatedRound),
       response.reintroducedRound == null ? response.reintroducedRound : ReintroducedRound.fromResponse(response.reintroducedRound),
+      response.isNominated,
     );
   }
 }

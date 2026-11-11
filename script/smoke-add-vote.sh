@@ -18,9 +18,10 @@ DVLIVE_BEARER_TOKEN="${DVLIVE_BEARER_TOKEN:-}"
 command -v curl >/dev/null || { echo 'FAIL: curl required' >&2; exit 1; }
 command -v jq >/dev/null || { echo 'FAIL: jq required' >&2; exit 1; }
 case "$DVLIVE_ENV" in
-  STAG) DVLIVE_BASE_URL='https://dev-webshow-engine.dv-live.com' ;;
+  DEV) DVLIVE_BASE_URL='https://dev-webshow-engine.dv-live.com' ;;
+  STAG) DVLIVE_BASE_URL='https://stag-webshow-engine.dv-live.com' ;;
   PROD) DVLIVE_BASE_URL='https://webshow-engine.dv-live.com' ;;
-  *) echo 'FAIL: DVLIVE_ENV must be STAG or PROD' >&2; exit 1 ;;
+  *) echo 'FAIL: DVLIVE_ENV must be DEV, STAG or PROD' >&2; exit 1 ;;
 esac
 [[ -n "$DVLIVE_BEARER_TOKEN" ]] || { echo 'FAIL: configure DVLIVE_BEARER_TOKEN in script/config.json' >&2; exit 1; }
 [[ -n "$SHOW_VOTE_UUID" ]] || { echo 'FAIL: SHOW_VOTE_UUID required' >&2; exit 1; }

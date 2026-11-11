@@ -2,7 +2,7 @@
  * Minimal DV Live web show engine API client.
  *
  * OpenAPI: openapi.json (DVLive web show engine — votes, participants).
- * Authentication: HTTP Bearer (Authorization: Bearer <token>).
+ * Authentication: LOCAL Bearer dev-auth-token; PROD optional X-Internal-Auth.
  */
 
 class DvliveError extends Error {
@@ -64,13 +64,29 @@ class DvliveValidationError extends DvliveError {
   }
 }
 
+const BASE_URLS = Object.freeze({
+  DEV: 'https://dev-webshow-engine.dv-live.com',
+  STAG: 'https://stag-webshow-engine.dv-live.com',
+  PROD: 'https://webshow-engine.dv-live.com',
+});
+
+const LOCAL_BASE_URLS = Object.freeze({
+  DEV: 'https://int-dev-webshow-engine.dv-live.com',
+  STAG: 'https://int-stag-webshow-engine.dv-live.com',
+  PROD: 'https://int-webshow-engine.dv-live.com',
+});
+
 class DvliveClient {
-  constructor({ baseUrl, bearerToken } = {}) {
-    if (!baseUrl || typeof baseUrl !== 'string') {
-      throw new Error('DvliveClient: baseUrl is required');
+  constructor({ environment, mode = 'PROD', albToken } = {}) {
+    if (mode !== 'LOCAL' && mode !== 'PROD') {
+      throw new Error('DvliveClient: mode must be LOCAL or PROD');
     }
-    this.baseUrl = baseUrl.replace(/\/+$/, '');
-    this.bearerToken = bearerToken || '';
+    if (!Object.hasOwn(BASE_URLS, environment)) {
+      throw new Error('DvliveClient: environment must be DEV, STAG or PROD');
+    }
+    this.mode = mode;
+    this.baseUrl = (mode === 'LOCAL' ? LOCAL_BASE_URLS : BASE_URLS)[environment];
+    this.albToken = mode === 'LOCAL' ? undefined : albToken?.trim() || undefined;
 
     this.showVoteChoices = {
       get: (uuid) => {
@@ -128,9 +144,9 @@ class DvliveClient {
 
     const reqHeaders = {
       Accept: 'application/json',
-      ...(this.bearerToken
-        ? { Authorization: `Bearer ${this.bearerToken}` }
-        : {}),
+      ...(this.mode === 'LOCAL'
+        ? { Authorization: 'Bearer dev-auth-token' }
+        : this.albToken ? { 'X-Internal-Auth': this.albToken } : {}),
       ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
       ...headers,
     };

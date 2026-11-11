@@ -17,9 +17,8 @@ test("Edge passes logging environment strings to SDK, with disabled/WARNING defa
   t.mock.method(globalThis, "fetch", async () => Response.json(show));
   const settings = {
     DVLIVE_ENV: "STAG",
-    DVLIVE_API_TOKEN: "private-token",
     APP_JWT_SECRET: secret,
-    DVLIVE_ALB_TOKEN_DEV: "alb-dev-secret",
+    DVLIVE_ALB_TOKEN_STAG: "alb-dev-secret",
   };
   const handle = createHandler({ env: name => settings[name] });
   assert.equal((await handle(request())).status, 200);
@@ -35,7 +34,7 @@ test("Edge passes logging environment strings to SDK, with disabled/WARNING defa
 });
 
 test("invalid enabled log level is an Edge configuration error; catalog needs no config", async () => {
-  const handle = createHandler({ env: name => ({ DVLIVE_ENV: "STAG", DVLIVE_API_TOKEN: "private-token", APP_JWT_SECRET: secret, DVLIVE_LOG_ENABLE: "TRUE", DVLIVE_LOG_LEVEL: "INVALID" })[name] });
+  const handle = createHandler({ env: name => ({ DVLIVE_ENV: "STAG", APP_JWT_SECRET: secret, DVLIVE_LOG_ENABLE: "TRUE", DVLIVE_LOG_LEVEL: "INVALID" })[name] });
   assert.equal((await handle(request())).status, 500);
   const catalog = createHandler({ env: () => { throw new Error("Catalog must not read configuration"); } });
   assert.equal((await catalog(new Request("https://edge.test/dvlive"))).status, 200);

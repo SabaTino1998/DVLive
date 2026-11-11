@@ -2,7 +2,7 @@ import { ShowVoteResponse } from "./responses/show-vote.ts";
 import { ShowVoteChoiceResponse } from "./responses/show-vote-choice.ts";
 import { GetVoterResponse, CreateVoterResponse, CastVoteResponse } from "./responses/voter.ts";
 import { ApiHttpError, ApiRequestError, ApiResponseError } from "./ApiErrors.ts";
-import { resolveAlbTokenSlot, resolveBaseUrl, type AlbTokenSlot } from "./environment.ts";
+import { resolveBaseUrl } from "./environment.ts";
 import { ApiResponse } from "./models/api-response.ts";
 import { ShowVote } from "./models/show-vote.ts";
 import { ShowVoteChoice } from "./models/show-vote-choice.ts";
@@ -17,13 +17,11 @@ interface HttpResponse extends ApiResponse<unknown> {
   bodyText: string;
 }
 
-export type AlbTokens = Partial<Record<AlbTokenSlot, string>>;
-
 export interface ApiServiceConfig {
   environment: string | undefined;
+  /** LOCAL uses internal hosts; PROD (default) uses external hosts. */
+  mode?: string;
   headers?: Record<string, string> | (() => Record<string, string>);
-  /** Optional ALB tokens keyed by host slot. Non-blank values set X-Internal-Auth. */
-  albTokens?: AlbTokens;
   timeoutMs?: number;
   /** Accepts TRUE/FALSE environment strings or booleans. Defaults to false. */
   logEnable?: boolean | string;
@@ -34,15 +32,13 @@ export interface ApiServiceConfig {
 export class ApiService {
   private readonly url: string;
   private readonly extraHeaders: ApiServiceConfig["headers"];
-  private readonly albTokens: AlbTokens;
   private readonly timeoutMs: number;
   private readonly logger: DvLiveLogger;
 
   constructor(config: ApiServiceConfig) {
-    this.url = resolveBaseUrl(config.environment);
+    this.url = resolveBaseUrl(config.environment, config.mode);
     this.logger = new DvLiveLogger(config.logEnable, config.logLevel);
     this.extraHeaders = config.headers;
-    this.albTokens = config.albTokens ?? {};
     this.timeoutMs = config.timeoutMs ?? 15000;
     if (!Number.isInteger(this.timeoutMs) || this.timeoutMs <= 0 || this.timeoutMs > 2147483647) {
       throw new TypeError("timeoutMs must be a positive 32-bit integer.");
@@ -115,19 +111,11 @@ export class ApiService {
     return `/show-vote/${encodeURIComponent(showVoteUuid)}/voter`;
   }
 
-  private albAuthHeader(): Record<string, string> {
-    const slot = resolveAlbTokenSlot(new URL(this.url).hostname);
-    if (!slot) return {};
-    const token = this.albTokens[slot]?.trim();
-    return token ? { "X-Internal-Auth": token } : {};
-  }
-
   private async request(operation: string, method: "GET" | "POST", path: string, body?: unknown): Promise<HttpResponse> {
     const extra = typeof this.extraHeaders === "function" ? this.extraHeaders() : this.extraHeaders;
     const headers = new Headers({
       Accept: "application/json",
       ...(body === undefined ? {} : { "Content-Type": "application/json" }),
-      ...this.albAuthHeader(),
     });
     new Headers(extra).forEach((value, key) => headers.set(key, value));
     const requestBody = body === undefined ? undefined : JSON.stringify(body);

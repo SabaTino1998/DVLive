@@ -15,6 +15,7 @@
     "getShowVote": "node run.js getShowVote",
     "createVoter": "node run.js createVoter",
     "getVoter": "node run.js getVoter",
-    "castVote": "node run.js castVote"
+    "castVote": "node run.js castVote",
+    "test": "node --test test/*.test.cjs"
   }
 }

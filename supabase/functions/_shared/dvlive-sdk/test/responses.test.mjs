@@ -150,3 +150,29 @@ test("round choice status accepts only EVICTED and PRESENT and reaches public DT
     } }), { message: "ShowVoteResponse.round.choices[0].status must be EVICTED or PRESENT." });
   }
 });
+
+test("getShowVoteChoice preserves all participant fields including optional isNominated", async t => {
+  const participant = {
+    uuid: "22222222-2222-4222-8222-222222222201",
+    showVoteUuid: "11111111-1111-4111-8111-111111111101",
+    firstname: "Camille", lastname: "Laurent", status: "PRESENT", order: 2,
+    bio: "Singer-songwriter from Lyon. Finalist of the 2025 open stage.",
+    desktopPicture: "https://attachments.example.com/candidate/image?signature=test",
+    mobilePicture: null, eliminatedRound: null, reintroducedRound: null,
+  };
+  for (const fields of [{ isNominated: true }, { isNominated: false }, {}]) {
+    const payload = { ...participant, ...fields };
+    t.mock.method(globalThis, "fetch", async () => Response.json(payload));
+    const result = await new ApiService({ environment: "DEV" }).getShowVoteChoice(participant.uuid);
+    assert.deepEqual(JSON.parse(JSON.stringify(result.data)), payload);
+    assert.equal(Object.hasOwn(result.data, "isNominated"), Object.hasOwn(fields, "isNominated"));
+  }
+  for (const isNominated of [null, "false", 0, 1, {}, []]) {
+    t.mock.method(globalThis, "fetch", async () => Response.json({ ...participant, isNominated }));
+    await assert.rejects(new ApiService({ environment: "DEV" }).getShowVoteChoice(participant.uuid), error => {
+      assert.ok(error instanceof ApiResponseError);
+      assert.equal(error.cause.message, "ShowVoteChoiceResponse.isNominated must be a boolean.");
+      return true;
+    });
+  }
+});

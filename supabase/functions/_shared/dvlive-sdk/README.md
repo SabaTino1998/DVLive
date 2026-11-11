@@ -12,7 +12,7 @@ import { ApiService, type ApiResponse, type ShowVote } from "@digitalvirgo/dvliv
 
 const api = new ApiService({
   environment: "STAG",
-  headers: () => ({ Authorization: `Bearer ${token}` }),
+  headers: token ? { "X-Internal-Auth": token } : undefined,
   timeoutMs: 15_000,
 });
 
@@ -25,13 +25,28 @@ console.log(result.headers.get("x-request-id"));
 `headers` accepts a static record or a synchronous callback evaluated for every
 request. The SDK provides `Accept: application/json` and, for JSON bodies,
 `Content-Type: application/json`; supplied headers override these defaults.
-`environment` is required and accepts exactly `"STAG"` or `"PROD"` (case-sensitive).
+`environment` is required and accepts exactly `"DEV"`, `"STAG"` or `"PROD"` (case-sensitive).
 The SDK selects the base URL internally; callers do not configure a URL:
 
 | Environment | Base URL |
 | --- | --- |
-| `STAG` | `https://dev-webshow-engine.dv-live.com` |
+| `DEV` | `https://dev-webshow-engine.dv-live.com` |
+| `STAG` | `https://stag-webshow-engine.dv-live.com` |
 | `PROD` | `https://webshow-engine.dv-live.com` |
+
+`ApiServiceConfig.mode` accepts `"LOCAL"` or `"PROD"` and defaults to `"PROD"`
+when absent. Invalid values throw `TypeError`. Mode is independent of environment.
+`LOCAL_BASE_URLS` has the same keys as `BASE_URLS`, with internal hosts:
+
+| Environment | LOCAL base URL |
+| --- | --- |
+| `DEV` | `https://int-dev-webshow-engine.dv-live.com` |
+| `STAG` | `https://int-stag-webshow-engine.dv-live.com` |
+| `PROD` | `https://int-webshow-engine.dv-live.com` |
+
+Authentication is supplied through `headers` by the application. The Edge Function uses `Authorization: Bearer <LOCAL_DVLIVE_API_TOKEN>` in LOCAL
+mode; the runner uses `Authorization: Bearer dev-auth-token`. Both use optional
+`X-Internal-Auth` in PROD mode.
 
 The URL mapping is maintained centrally in `src/environment.ts`.
 Invalid or missing environments throw `TypeError`; there is no implicit fallback.
@@ -125,6 +140,8 @@ removed rather than retained as aliases. The mode catalog now reports DTO names.
 Field names in the returned JSON are unchanged; additional upstream fields are omitted.
 
 `ShowVote.round.choices` exposes `isNominated?: boolean` on each `Choice`.
+`getShowVoteChoice` also exposes `isNominated?: boolean` on `ShowVoteChoice`;
+true and false are preserved, omission remains supported, and other types are rejected.
 When supplied, it must be a boolean; `true` and `false` are preserved, and an
 absent field remains absent.
 
@@ -273,7 +290,7 @@ Logging is opt-in and configured per `ApiService` instance. The SDK does not rea
 ```ts
 const api = new ApiService({
   environment: env("DVLIVE_ENV"),
-  headers: () => ({ Authorization: `Bearer ${token}` }),
+  headers: token ? { "X-Internal-Auth": token } : undefined,
   logEnable: env("DVLIVE_LOG_ENABLE"),
   logLevel: env("DVLIVE_LOG_LEVEL"),
 });
@@ -320,20 +337,22 @@ The Edge Function maps the package name to `supabase/functions/_shared/dvlive-sd
 prebuilt `dist/`. Set the Supabase environment file to:
 
 ```dotenv
+DVLIVE_MODE=PROD
 DVLIVE_ENV=STAG
-DVLIVE_API_TOKEN=<server-only-dvlive-api-token>
 # DVLIVE_ALB_TOKEN_DEV=<alb-token-for-dev-webshow-engine>
 # DVLIVE_ALB_TOKEN_STAG=<alb-token-for-stag-webshow-engine>
 # DVLIVE_ALB_TOKEN_PROD=<alb-token-for-webshow-engine>
 ```
 
-The Edge Function passes `DVLIVE_ENV` directly as `environment` to the SDK and
-supplies `Authorization: Bearer` from the server secret `DVLIVE_API_TOKEN`.
-Optional `DVLIVE_ALB_TOKEN_*` values are passed as `albTokens`; the SDK sets
-`X-Internal-Auth` from the request host when the matching token is non-blank.
-Callers do not send `bearer-token` or the DV Live token. Only the SDK validates
-supported environment values and selects the upstream base URL. Missing or
-invalid configuration returns HTTP 500, while the mode catalog remains available.
+The Edge Function passes `DVLIVE_ENV` directly as `environment` to the SDK.
+It also passes `DVLIVE_MODE` as `mode`, defaulting to `PROD` when absent.
+In PROD mode, it reads only `DVLIVE_ALB_TOKEN_${DVLIVE_ENV}` and passes a non-blank value
+through `headers` as `X-Internal-Auth`; absent or blank values omit the header.
+In LOCAL mode, it does not read ALB tokens and supplies only
+`Authorization: Bearer <LOCAL_DVLIVE_API_TOKEN>` through `headers`. The app JWT is
+verified by the Edge Function and is never forwarded upstream.
+The SDK validates supported environments and selects the upstream base URL.
+Missing or invalid environment returns HTTP 500; the catalog remains available.
 The SDK does not read `.env` or cache authentication.
 
 The Edge Function handles HTTP method, query and header extraction, content type
