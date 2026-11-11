@@ -19,6 +19,8 @@ interface HttpResponse extends ApiResponse<unknown> {
 
 export interface ApiServiceConfig {
   environment: string | undefined;
+  /** INT uses internal hosts; PROD (default) uses external hosts. */
+  mode?: string;
   headers?: Record<string, string> | (() => Record<string, string>);
   timeoutMs?: number;
   /** Accepts TRUE/FALSE environment strings or booleans. Defaults to false. */
@@ -34,7 +36,7 @@ export class ApiService {
   private readonly logger: DvLiveLogger;
 
   constructor(config: ApiServiceConfig) {
-    this.url = resolveBaseUrl(config.environment);
+    this.url = resolveBaseUrl(config.environment, config.mode);
     this.logger = new DvLiveLogger(config.logEnable, config.logLevel);
     this.extraHeaders = config.headers;
     this.timeoutMs = config.timeoutMs ?? 15000;
@@ -111,14 +113,17 @@ export class ApiService {
 
   private async request(operation: string, method: "GET" | "POST", path: string, body?: unknown): Promise<HttpResponse> {
     const extra = typeof this.extraHeaders === "function" ? this.extraHeaders() : this.extraHeaders;
-    const headers = new Headers({ Accept: "application/json", ...(body === undefined ? {} : { "Content-Type": "application/json" }) });
+    const headers = new Headers({
+      Accept: "application/json",
+      ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+    });
     new Headers(extra).forEach((value, key) => headers.set(key, value));
     const requestBody = body === undefined ? undefined : JSON.stringify(body);
     const signal = AbortSignal.timeout(this.timeoutMs);
     const started = Date.now();
     const secrets: string[] = [];
     headers.forEach((value, key) => {
-      if (/authorization|token|key/i.test(key)) secrets.push(value, value.replace(/^Bearer\s+/i, ""));
+      if (/authorization|token|key|x-internal-auth/i.test(key)) secrets.push(value, value.replace(/^Bearer\s+/i, ""));
     });
     const voterRef = path.match(/\/voter\/([^/]+)/)?.[1];
     if (voterRef) secrets.push(voterRef, decodeURIComponent(voterRef));

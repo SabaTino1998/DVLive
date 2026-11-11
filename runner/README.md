@@ -16,12 +16,20 @@ It mirrors the Smart Journey reference runner (`smart-journey/runner/`): one HTT
    cp config.example.json config.json
    ```
 
-2. Set `baseUrl` and `bearerToken` (HTTP Bearer). All OpenAPI endpoints require a valid token.
+2. Set `DVLIVE_MODE` to `INT` or `PROD` (default when absent).
+   Set `DVLIVE_ENV` to `DEV`, `STAG` or `PROD` and provide a nonblank
+   `DVLIVE_API_TOKEN`, always sent as `Authorization: Bearer <DVLIVE_API_TOKEN>`.
+   `INT` uses the internal `int-` hosts and ignores ALB tokens.
+   `PROD` selects the external host and also sends `X-Internal-Auth` when the
+   matching `DVLIVE_ALB_TOKEN_<environment>` is nonblank.
+   Environment variables override these JSON settings.
 
    ```json
    {
-     "baseUrl": "https://your-dvlive-api.example.com",
-     "bearerToken": "…",
+     "DVLIVE_MODE": "PROD",
+     "DVLIVE_ENV": "STAG",
+     "DVLIVE_API_TOKEN": "…",
+     "DVLIVE_ALB_TOKEN_STAG": "…",
      "action": "getShowVote",
      "showVote": { "uuid": "…" }
    }
@@ -44,14 +52,18 @@ npm start -- getVoter      # CLI arg overrides config.action
 node run.js getShowVote
 ```
 
-Each run prints the call signature, the full JSON response, and a short summary where useful.
+Each run prints a curl command including the actual authentication value, the call signature, the full JSON response, and a short summary where useful.
 
 ## Configuration reference
 
 | Key | Type | Required | Description |
 | --- | --- | --- | --- |
-| `baseUrl` | string | yes | API base URL (no trailing slash). |
-| `bearerToken` | string | yes (prod) | Bearer token for `Authorization`. |
+| `DVLIVE_MODE` | string | no | `INT` or `PROD`; defaults to `PROD`. Invalid values fail configuration. |
+| `DVLIVE_ENV` | string | yes | `DEV`, `STAG` or `PROD`; selects the API environment independently of access mode. |
+| `DVLIVE_API_TOKEN` | string | yes | Nonblank bearer token required in both INT and PROD modes. |
+| `DVLIVE_ALB_TOKEN_DEV` | string | no | DEV `X-Internal-Auth` token in `PROD` mode. |
+| `DVLIVE_ALB_TOKEN_STAG` | string | no | STAG `X-Internal-Auth` token in `PROD` mode. |
+| `DVLIVE_ALB_TOKEN_PROD` | string | no | PROD `X-Internal-Auth` token in `PROD` mode. |
 | `action` | string | no | Default action; overridden by CLI arg. |
 | `showVote.uuid` | string | yes for `getShowVote` | Show vote UUID. |
 | `showVoteChoice.uuid` | string | yes for `getShowVoteChoice` | Choice/participant UUID. |
@@ -93,3 +105,10 @@ For POST actions, path fields (`showVoteUuid`, `userRef`) are stripped from the 
 
 For vote crediting, use the standalone `../script/smoke-add-vote.sh` direct-curl smoke test.
 The upstream OpenAPI retains the endpoint for reference.
+
+The external hosts are `dev-webshow-engine.dv-live.com` (DEV),
+`stag-webshow-engine.dv-live.com` (STAG) and `webshow-engine.dv-live.com` (PROD).
+External ALB access currently allows GET and HEAD. `createVoter` and `castVote`
+use POST and require POST to be enabled by the service owner.
+
+Run mocked checks without calling the upstream service with `npm test`.

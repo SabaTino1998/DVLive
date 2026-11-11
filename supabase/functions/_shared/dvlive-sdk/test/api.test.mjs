@@ -11,7 +11,7 @@ for (const [method, args, path, payload] of cases) {
     const body = requestBodies[method];
     const status = body ? 201 : 200;
     const mock = t.mock.method(globalThis, "fetch", async (url, options) => {
-      assert.equal(url.href, `https://dev-webshow-engine.dv-live.com${path}`);
+      assert.equal(url.href, `https://stag-webshow-engine.dv-live.com${path}`);
       assert.equal(options.method, body ? "POST" : "GET");
       assert.equal(options.headers.get("authorization"), "Bearer test-token");
       assert.equal(options.headers.get("accept"), "application/json");
@@ -141,7 +141,7 @@ test("dynamic headers refresh on each call and concurrent clients keep their own
 
 test("invalid environment, configuration and path parameters fail before making a request", async (t) => {
   const mock = t.mock.method(globalThis, "fetch", () => { throw new Error("Unexpected request"); });
-  for (const environment of ["", "stag", "prod", "DEV", "https://upstream.test", undefined, null, {}, "constructor", "__proto__"]) {
+  for (const environment of ["", "stag", "prod", "dev", "https://upstream.test", undefined, null, {}, "constructor", "__proto__"]) {
     assert.throws(() => new ApiService({ environment }), TypeError);
   }
   for (const timeoutMs of [0, -1, Infinity, 0.5]) assert.throws(() => new ApiService({ ...config, timeoutMs }), TypeError);
@@ -150,18 +150,19 @@ test("invalid environment, configuration and path parameters fail before making 
   assert.equal(mock.mock.callCount(), 0);
 });
 
-test("STAG and PROD choose their SDK base URLs without external URL configuration", async (t) => {
+test("DEV, STAG and PROD choose their SDK base URLs without external URL configuration", async (t) => {
   const urls = [];
   t.mock.method(globalThis, "fetch", async (url) => {
     urls.push(url.href);
     return Response.json(show);
   });
-  for (const environment of ["STAG", "PROD"]) {
+  for (const environment of ["DEV", "STAG", "PROD"]) {
     await new ApiService({ environment }).getShowVote("show");
   }
   // Production uses its configured SDK host.
   assert.deepEqual(urls, [
     "https://dev-webshow-engine.dv-live.com/show-vote/show",
+    "https://stag-webshow-engine.dv-live.com/show-vote/show",
     "https://webshow-engine.dv-live.com/show-vote/show",
   ]);
 });
@@ -214,4 +215,20 @@ test("unmappable nested responses retain HTTP context in ApiResponseError", asyn
     assert.deepEqual(JSON.parse(error.bodyText), payload);
     return true;
   });
+});
+
+test("access mode selects internal or external hosts independently from environment", async t => {
+  const capture = t.mock.method(globalThis, "fetch", async () => Response.json(show));
+  for (const environment of ["DEV", "STAG", "PROD"]) {
+    for (const mode of [undefined, "PROD", "INT"]) {
+      await new ApiService({ environment, mode }).getShowVote("show");
+      const prefix = environment === "PROD" ? "" : `${environment.toLowerCase()}-`;
+      assert.equal(capture.mock.calls.at(-1).arguments[0].hostname,
+        `${mode === "INT" ? "int-" : ""}${prefix}webshow-engine.dv-live.com`);
+    }
+  }
+  for (const mode of ["", "LOCAL", "int", "INVALID", null]) {
+    assert.throws(() => new ApiService({ environment: "STAG", mode }), /mode must be/);
+  }
+  assert.equal(capture.mock.callCount(), 9);
 });

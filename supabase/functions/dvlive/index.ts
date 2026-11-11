@@ -14,11 +14,9 @@ import {
 } from "@digitalvirgo/dvlive-api";
 import { verifyAppJwt } from "../_shared/verify-app-jwt.ts";
 
-const DVLIVE_ENV = Deno.env.get("DVLIVE_ENV") || "";
-const DVLIVE_API_TOKEN = Deno.env.get("DVLIVE_API_TOKEN") || "";
-const DVLIVE_LOG_ENABLE = Deno.env.get("DVLIVE_LOG_ENABLE");
-const DVLIVE_LOG_LEVEL = Deno.env.get("DVLIVE_LOG_LEVEL");
-const TAG = `[DVLive][${DVLIVE_ENV || "unset"}]`;
+interface HandlerOptions {
+  env: (name: string) => string | undefined;
+}
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -66,6 +64,10 @@ class InputError extends Error {
     this.code = code;
     this.headers = headers;
   }
+}
+
+function trimSecret(value: string | undefined): string {
+  return value?.trim() ?? "";
 }
 
 async function parseRequestBody(req: Request, action: ApiModeDefinition, mode: ApiModes): Promise<unknown> {
@@ -121,8 +123,26 @@ function callApi(
   }
 }
 
-Deno.serve(async (req: Request): Promise<Response> => {
+export function createHandler({ env }: HandlerOptions) {
+  return async (req: Request): Promise<Response> => {
+    // Route Deno.env.get through the injected env so verifyAppJwt and tests share one source.
+    const denoEnv = Deno.env as { get: (name: string) => string | undefined };
+    const previousGet = denoEnv.get;
+    denoEnv.get = (name: string) => env(name);
+    try {
+      return await handleRequestWithEnv(req, env);
+    } finally {
+      denoEnv.get = previousGet;
+    }
+  };
+}
+
+async function handleRequestWithEnv(
+  req: Request,
+  env: HandlerOptions["env"],
+): Promise<Response> {
   const ts = new Date().toISOString();
+  let tag = "[DVLive][unset]";
 
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -132,18 +152,30 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const url = new URL(req.url);
     const parsed = parseMode(url.searchParams.get("mode"));
     if (parsed.mode === null) {
-      console.log(`${TAG} ${ts} | catalog`);
+      console.log(`${tag} ${ts} | catalog`);
       return ok(parsed.catalog);
     }
 
+    const dvliveEnv = trimSecret(env("DVLIVE_ENV"));
+    tag = `[DVLive][${dvliveEnv || "unset"}]`;
     const mode = parsed.mode;
     const action = API_MODES[mode];
     const body = await parseRequestBody(req, action, mode);
 
     const auth = await verifyAppJwt(req);
     if (!auth.ok) {
-      console.log(`${TAG} ${ts} | auth failed mode=${mode} status=${auth.status}`);
-      return fail(auth.status, auth.message, auth.status === 403 ? "FORBIDDEN" : auth.status === 500 ? "SERVER_MISCONFIGURED" : auth.status === 502 ? "AUTH_SERVICE_ERROR" : "AUTH_REQUIRED");
+      console.log(`${tag} ${ts} | auth failed mode=${mode} status=${auth.status}`);
+      return fail(
+        auth.status,
+        auth.message,
+        auth.status === 403
+          ? "FORBIDDEN"
+          : auth.status === 500
+          ? "SERVER_MISCONFIGURED"
+          : auth.status === 502
+          ? "AUTH_SERVICE_ERROR"
+          : "AUTH_REQUIRED",
+      );
     }
 
     const needsUser =
@@ -155,26 +187,34 @@ Deno.serve(async (req: Request): Promise<Response> => {
       return fail(403, "Missing absolute_reference claim.", "FORBIDDEN");
     }
 
-    if (!DVLIVE_API_TOKEN || !DVLIVE_ENV) {
-      console.error(`${TAG} ${ts} | missing DVLIVE_API_TOKEN or DVLIVE_ENV`);
-      return fail(500, "DVLive is not configured.", "SERVER_MISCONFIGURED");
-    }
+    const dvliveMode = env("DVLIVE_MODE")?.trim() ?? "PROD";
+    const albToken = dvliveMode === "INT"
+      ? undefined
+      : trimSecret(env(`DVLIVE_ALB_TOKEN_${dvliveEnv}`)) || undefined;
 
     let api: ApiService;
     try {
+      const apiToken = trimSecret(env("DVLIVE_API_TOKEN"));
+      if (!apiToken) {
+        throw new TypeError("DVLIVE_API_TOKEN is required.");
+      }
       api = new ApiService({
-        environment: DVLIVE_ENV,
-        logEnable: DVLIVE_LOG_ENABLE,
-        logLevel: DVLIVE_LOG_LEVEL,
-        headers: () => ({ Authorization: `Bearer ${DVLIVE_API_TOKEN}` }),
+        environment: dvliveEnv,
+        mode: dvliveMode,
+        logEnable: env("DVLIVE_LOG_ENABLE"),
+        logLevel: env("DVLIVE_LOG_LEVEL"),
+        headers: {
+          Authorization: `Bearer ${apiToken}`,
+          ...(albToken ? { "X-Internal-Auth": albToken } : {}),
+        },
       });
     } catch (err) {
-      console.error(`${TAG} ${ts} | invalid SDK config:`, err instanceof Error ? err.message : err);
+      console.error(`${tag} ${ts} | invalid SDK config:`, err instanceof Error ? err.message : err);
       return fail(500, "Invalid DVLive SDK configuration.", "SERVER_MISCONFIGURED");
     }
 
     console.log(
-      `${TAG} ${ts} | mode=${mode}${needsUser ? ` user=${userRef.slice(0, 4)}***` : ""}`,
+      `${tag} ${ts} | mode=${mode}${needsUser ? ` user=${userRef.slice(0, 4)}***` : ""}`,
     );
     const result = await callApi(api, mode, url.searchParams, body, userRef);
     return ok(result.data, result.status);
@@ -201,7 +241,17 @@ Deno.serve(async (req: Request): Promise<Response> => {
     if (err instanceof ApiResponseError) {
       return fail(502, err.message, "UPSTREAM_ERROR");
     }
-    console.error(`${TAG} ${ts} | unexpected:`, err instanceof Error ? err.message : err);
+    console.error(`${tag} ${ts} | unexpected:`, err instanceof Error ? err.message : err);
     return fail(500, "Internal DVLive error.", "INTERNAL_ERROR");
   }
-});
+}
+
+// Bound inside this export so Node edge tests, which strip from handleRequest onward,
+// never touch Deno.env at import time. The bind also avoids recursion when createHandler
+// temporarily replaces Deno.env.get for verifyAppJwt.
+export const handleRequest = (() => {
+  const denoEnvGet = Deno.env.get.bind(Deno.env);
+  return createHandler({ env: (name) => denoEnvGet(name) });
+})();
+
+Deno.serve(handleRequest);

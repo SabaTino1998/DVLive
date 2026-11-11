@@ -1,29 +1,27 @@
 {
-  "baseUrl": "https://your-dvlive-api.example.com",
-  "bearerToken": "",
-
+  "DVLIVE_MODE": "PROD",
+  "DVLIVE_API_TOKEN": "<api-token>",
+  "DVLIVE_ENV": "STAG",
+  "DVLIVE_ALB_TOKEN_DEV": "",
+  "DVLIVE_ALB_TOKEN_STAG": "",
+  "DVLIVE_ALB_TOKEN_PROD": "",
   "action": "getShowVote",
-
   "showVote": {
     "uuid": "00000000-0000-4000-8000-000000000001"
   },
-
   "showVoteChoice": {
     "uuid": "22222222-2222-4222-8222-222222222201"
   },
-
   "createVoter": {
     "showVoteUuid": "00000000-0000-4000-8000-000000000001",
     "email": "ozzy.osbourne@example.com",
     "phone": "+33601020304",
     "uniqRef": "ozzy-001"
   },
-
   "getVoter": {
     "showVoteUuid": "00000000-0000-4000-8000-000000000001",
     "userRef": "ozzy-001"
   },
-
   "castVote": {
     "showVoteUuid": "00000000-0000-4000-8000-000000000001",
     "userRef": "ozzy-001",

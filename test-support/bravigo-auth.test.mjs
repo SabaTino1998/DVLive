@@ -105,7 +105,7 @@ test('dvlive accepts Bravigo flat and app_metadata JWTs and ignores supplied use
       ? Response.json({ uniqRef: REFERENCE, remainingPoints: 1, userFraudStatus: 'CLEAN', balance: { standardPoint: 1 } })
       : Response.json({ status: 'success', code: 201, message: 'Recorded', nbVoteRemaining: 1 }, { status: 201 });
   });
-  const handle = createHandler({ env: name => ({ DVLIVE_ENV: 'STAG', DVLIVE_API_TOKEN: 'dv-api-token', SUPABASE_JWT_SECRET: SECRET })[name] });
+  const handle = createHandler({ env: name => ({ DVLIVE_API_TOKEN: 'private-token', DVLIVE_ENV: 'STAG', SUPABASE_JWT_SECRET: SECRET })[name] });
   for (const claims of [{ ...appClaims, absolute_reference: REFERENCE }, { app_metadata: { ...appClaims, absolute_reference: REFERENCE }, aud: 'authenticated', iss: 'http://localhost/auth/v1' }]) {
     const jwt = await sign(claims);
     const voter = await handle(voterRequest(jwt, 'getVoter'));
@@ -114,7 +114,7 @@ test('dvlive accepts Bravigo flat and app_metadata JWTs and ignores supplied use
     assert.equal((await handle(voterRequest(jwt, 'createVoter', { uniqRef: 'attacker', email: 'test@example.test' }))).status, 201);
     assert.equal((await handle(voterRequest(jwt, 'castVote', { votes: [{ choiceUuid: 'choice', nbVotes: 1 }] }))).status, 201);
   }
-  assert.ok(calls.every(call => call.authorization === 'Bearer dv-api-token'));
+  assert.ok(calls.every(call => call.authorization === 'Bearer private-token'));
   assert.ok(calls.filter(call => call.body?.email).every(call => call.body.uniqRef === REFERENCE));
   assert.ok(calls.filter(call => !call.body || call.body.votes).every(call => call.path.includes(`/voter/${REFERENCE}`)));
   assert.ok(!JSON.stringify(calls).includes('attacker'));
@@ -122,7 +122,7 @@ test('dvlive accepts Bravigo flat and app_metadata JWTs and ignores supplied use
 
 test('dvlive rejects missing, expired, forged and non-app JWTs before upstream access', async t => {
   const send = t.mock.method(globalThis, 'fetch', () => { throw new Error('Unexpected DVLive call'); });
-  const handle = createHandler({ env: name => ({ DVLIVE_ENV: 'STAG', DVLIVE_API_TOKEN: 'dv-api-token', APP_JWT_SECRET: SECRET })[name] });
+  const handle = createHandler({ env: name => ({ DVLIVE_API_TOKEN: 'private-token', DVLIVE_ENV: 'STAG', APP_JWT_SECRET: SECRET })[name] });
   const valid = await sign(appClaims);
   for (const jwt of ['', 'N_session', `${valid.slice(0, -8)}xxxxxxxx`, await sign(appClaims, getNumericDate(-20))]) {
     assert.equal((await handle(voterRequest(jwt, 'getVoter'))).status, 401);
@@ -133,7 +133,7 @@ test('dvlive rejects missing, expired, forged and non-app JWTs before upstream a
 
 test('show and choice require app JWTs and never accept a caller DV Live token', async t => {
   const send = t.mock.method(globalThis, 'fetch', () => { throw new Error('Unexpected DVLive call'); });
-  const handle = createHandler({ env: name => ({ DVLIVE_ENV: 'STAG', DVLIVE_API_TOKEN: 'server-token', APP_JWT_SECRET: SECRET })[name] });
+  const handle = createHandler({ env: name => ({ DVLIVE_API_TOKEN: 'private-token', DVLIVE_ENV: 'STAG', APP_JWT_SECRET: SECRET })[name] });
   for (const mode of ['getShowVote', 'getShowVoteChoice']) {
     const response = await handle(new Request(`http://edge.test/dvlive?mode=${mode}&uuid=show`, { headers: { 'bearer-token': 'caller-token' } }));
     assert.equal(response.status, 401);
@@ -145,17 +145,19 @@ test('show and choice require app JWTs and never accept a caller DV Live token',
   assert.equal(send.mock.callCount(), 0);
 });
 
-test('missing server DV Live secret is a configuration error, even with caller header', async () => {
-  const handle = createHandler({ env: name => ({ DVLIVE_ENV: 'STAG', APP_JWT_SECRET: SECRET })[name] });
+test('DVLive sends the configured API bearer secret without forwarding caller tokens', async t => {
+  const send = t.mock.method(globalThis, 'fetch', async () => Response.json({ name: 'Show', startDate: '2026-01-01', endDate: '2026-12-31' }));
+  const handle = createHandler({ env: name => ({ DVLIVE_API_TOKEN: 'private-token', DVLIVE_ENV: 'STAG', APP_JWT_SECRET: SECRET })[name] });
   const response = await handle(new Request('http://edge.test/dvlive?mode=getShowVote&uuid=show', { headers: { Authorization: `Bearer ${await sign(appClaims)}`, 'bearer-token': 'caller-token' } }));
-  assert.equal(response.status, 500);
-  assert.equal((await response.json()).error.code, 'CONFIGURATION_ERROR');
+  assert.equal(response.status, 200);
+  assert.equal(send.mock.calls[0].arguments[1].headers.get('Authorization'), 'Bearer private-token');
+  assert.equal(send.mock.calls[0].arguments[1].headers.get('bearer-token'), null);
 });
 
 test('DV Live JSON errors are wrapped as details with original HTTP status', async t => {
   const upstream = { message: 'Vote rejected', code: 'upstream-code' };
   t.mock.method(globalThis, 'fetch', async () => Response.json(upstream, { status: 409 }));
-  const handle = createHandler({ env: name => ({ DVLIVE_ENV: 'STAG', DVLIVE_API_TOKEN: 'server-token', APP_JWT_SECRET: SECRET })[name] });
+  const handle = createHandler({ env: name => ({ DVLIVE_API_TOKEN: 'private-token', DVLIVE_ENV: 'STAG', APP_JWT_SECRET: SECRET })[name] });
   const response = await handle(voterRequest(await sign(appClaims), 'castVote', { votes: [{ choiceUuid: 'choice', nbVotes: 1 }] }));
   assert.equal(response.status, 409);
   const result = await response.json();
@@ -165,7 +167,7 @@ test('DV Live JSON errors are wrapped as details with original HTTP status', asy
 });
 
 test('missing Supabase Auth configuration reports configuration failure instead of invalid token', async () => {
-  const handle = createHandler({ env: name => ({ DVLIVE_ENV: 'STAG', DVLIVE_API_TOKEN: 'server-token' })[name] });
+  const handle = createHandler({ env: name => ({ DVLIVE_API_TOKEN: 'private-token', DVLIVE_ENV: 'STAG' })[name] });
   const response = await handle(voterRequest(await sign(appClaims), 'getVoter'));
   assert.equal(response.status, 500);
   const result = await response.json();
@@ -188,7 +190,7 @@ test('local mode verifies GoTrue tokens through Auth without any app JWT secret'
     assert.equal(options.headers.get('Authorization'), 'Bearer dv-api-token');
     return Response.json({ uniqRef: REFERENCE, remainingPoints: 1, userFraudStatus: 'CLEAN', balance: { standardPoint: 1 } });
   });
-  const handle = createHandler({ env: name => ({ SUPABASE_URL: 'http://supabase.test', SUPABASE_ANON_KEY: 'anon-key', DVLIVE_API_TOKEN: 'dv-api-token', DVLIVE_ENV: 'STAG' })[name] });
+  const handle = createHandler({ env: name => ({ SUPABASE_URL: 'http://supabase.test', SUPABASE_ANON_KEY: 'anon-key', DVLIVE_API_TOKEN: 'private-token', DVLIVE_ENV: 'STAG' })[name] });
   const response = await handle(voterRequest(jwt, 'getVoter'));
   assert.equal(response.status, 200);
   assert.equal((await response.json()).data.uniqRef, REFERENCE);

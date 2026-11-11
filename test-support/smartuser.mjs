@@ -65,7 +65,8 @@ export async function getSmartUserToken(config, loadSdk = () => import('@digital
 }
 
 export async function getSmartUserAppSession(config, loadSdk, send = fetch) {
-  if (!config.supabaseUrl || !config.supabaseKey || config.supabaseKey.startsWith('sb_secret_')) throw new Error('Configure the Supabase URL and public key.');
+  if (!config.supabaseUrl || !config.supabaseKey) throw new Error('Configure SUPABASE_URL and SUPABASE_ANON_KEY in script/config.json (use a public anon or publishable key).');
+  if (config.supabaseKey.startsWith('sb_secret_')) throw new Error('SUPABASE_ANON_KEY in script/config.json contains a secret key (sb_secret_). Use the public anon or publishable key for the same Supabase project.');
   const token = await getSmartUserToken(config, loadSdk);
   const response = await send(`${config.supabaseUrl.replace(/\/$/, '')}/functions/v1/bolt-auth-proxy`, {
     method: 'POST', headers: { 'Content-Type': 'application/json', apikey: config.supabaseKey },

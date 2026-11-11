@@ -15,7 +15,7 @@ cp script/config.example.json script/config.json
 Compilare i campi stringa del JSON: App ID, secret e ambiente SmartUser,
 username/email e password del test, bearer DV Live e `SHOW_VOTE_UUID`.
 `SUPABASE_URL` e `SUPABASE_ANON_KEY` sono opzionali; lasciare la chiave vuota
-per il rilevamento locale automatico. `DVLIVE_ENV` opzionale seleziona STAG/PROD
+per il rilevamento locale automatico. `DVLIVE_ENV` opzionale seleziona DEV/STAG/PROD
 per lo smoke add-vote diretto (default STAG).
 
 `smoke-config.sh` legge solo le chiavi riconosciute con jq, senza eseguire il
@@ -57,7 +57,7 @@ Se setup o login falliscono, oppure il token dopo il login non è `N_…`, termi
 Gli smoke dei cinque comandi non inviano `userRef`/`uniqRef`: eseguono login SmartUser,
 poi `syncUser` con il token N e `service_slug` (default `dvlive`). Usano il JWT
 restituito in `Authorization`. La edge ricava l’identità da `absolute_reference` nel JWT verificato, anche in
-`app_metadata`. Il token API DVLive è nel secret server `DVLIVE_API_TOKEN`;
+`app_metadata`. Il token API DVLive è nel secret server `DVLIVE_ALB_TOKEN_DEV`, `DVLIVE_ALB_TOKEN_STAG`, `DVLIVE_ALB_TOKEN_PROD` (selected by `DVLIVE_ENV`);
 gli smoke dei comandi non inviano `bearer-token`. Le risposte usano l’envelope
 `{ ok, data }`; le verifiche dei campi operano su `data`.
 
@@ -137,10 +137,10 @@ Per progetti remoti inserire URL e chiave Supabase in `script/config.json`.
 
 Quando la verifica JWT del gateway è abilitata, usare un JWT accettato dal progetto,
 per esempio una chiave anon JWT legacy. Le nuove chiavi publishable non sono JWT.
-La variabile server obbligatoria in `supabase/.env` è `DVLIVE_ENV=STAG` oppure
+La variabile server obbligatoria in `supabase/.env` è `DVLIVE_ENV=DEV`, `DVLIVE_ENV=STAG` oppure
 `DVLIVE_ENV=PROD`, caricata passando `--env-file supabase/.env` a
-`supabase functions serve`. L'SDK configura il base URL: `STAG` usa
-`https://dev-webshow-engine.dv-live.com`, `PROD` usa `https://webshow-engine.dv-live.com`. Il token DV Live resta
+`supabase functions serve`. L'SDK configura il base URL: `DEV` usa
+`https://dev-webshow-engine.dv-live.com`, `STAG` usa `https://stag-webshow-engine.dv-live.com`, `PROD` usa `https://webshow-engine.dv-live.com`. Il token DV Live resta
 nella configurazione comune degli smoke test e viene passato nelle chiamate.
 Il file `script/config.json` è dedicato agli smoke e indipendente dalla configurazione Expo.
 
@@ -167,7 +167,7 @@ blocco locale dello smoke, senza `export`.
 Invia con curl `POST /show-vote/{showVoteUuid}/voter/{userRef}/add-vote`, con body
 `{ "additionalVoteType": "VIDEO", "nbPoints": 1 }` e header
 `Authorization: Bearer <token DV Live>`. Non usa chiavi né header Supabase.
-`STAG` usa `https://dev-webshow-engine.dv-live.com`; `PROD` usa
+`DEV` usa `https://dev-webshow-engine.dv-live.com`; `STAG` usa `https://stag-webshow-engine.dv-live.com`; `PROD` usa
 `https://webshow-engine.dv-live.com`. `USER_REF` è una absolute reference, mai un token N.
 Questa operazione non è più esposta nel catalogo SDK/Edge Function né nel runner.
 `castVote` invia un voto per `CHOICE_UUID`; `VOTES` permette di passare un array JSON:

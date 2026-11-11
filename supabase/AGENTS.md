@@ -24,7 +24,7 @@ logic reusable across projects rather than implementing it in the Edge Function.
 
 Explicit user instruction: the DVLive SDK has no published npm version.
 Preserve the existing local mapping `../_shared/dvlive-sdk/src/index.ts` and the
-public import `@digitalvirgo/dvlive-api`. Do not modify the SDK for auth changes.
+public import `@digitalvirgo/dvlive-api`. Keep environment routing and ALB token types in the SDK.
 
 The user requires `bolt-auth-proxy/index.ts`, its `deno.json`, and
 `_shared/resolve-product.ts` to stay identical to the Bravigo source.
@@ -40,9 +40,10 @@ Pass the environment value directly to the SDK:
 ```ts
 const api = new ApiService({
   environment: env("DVLIVE_ENV"),
+  mode: env("DVLIVE_MODE")?.trim() ?? "PROD",
   logEnable: env("DVLIVE_LOG_ENABLE"),
   logLevel: env("DVLIVE_LOG_LEVEL"),
-  headers: () => ({ Authorization: `Bearer ${token}` }),
+  headers: albToken ? { "X-Internal-Auth": albToken } : undefined,
 });
 ```
 
@@ -50,9 +51,16 @@ The SDK validates supported values and selects the upstream URL. Do not import
 or expose `ApiEnvironment`, duplicate environment checks, or define upstream
 URLs in the function. Invalid SDK configuration returns HTTP 500.
 
-Read the fixed DV Live token from server secret `DVLIVE_API_TOKEN`, trim it,
-and return a 500 `CONFIGURATION_ERROR` when absent. Ignore caller `bearer-token`.
-Supply the secret as upstream `Authorization: Bearer <token>` and never log it.
+`DVLIVE_MODE` accepts LOCAL or PROD and defaults to PROD when absent. The SDK
+validates mode and owns BASE_URLS/LOCAL_BASE_URLS routing. In LOCAL, use the
+corresponding int- host and supply only Authorization: Bearer <LOCAL_DVLIVE_API_TOKEN>
+through SDK headers; trim the token and reject missing or blank values with
+HTTP 500. Do not read ALB tokens in LOCAL or the local token in PROD.
+In PROD, read only `DVLIVE_ALB_TOKEN_${DVLIVE_ENV}` and trim it. Missing or blank values
+become undefined and omit the header. Pass a non-blank token through the SDK's
+`headers` option as `X-Internal-Auth`. Do not pass a separate `albToken` option.
+PROD upstream requests do not use Bearer authentication.
+Never forward caller authentication to the upstream or log the ALB token.
 
 Supabase gateway authentication is separate from DV Live authentication.
 `verify_jwt` is false for both functions. All five commands require an app JWT

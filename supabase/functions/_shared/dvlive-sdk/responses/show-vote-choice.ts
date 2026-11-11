@@ -72,6 +72,7 @@ export class ChoiceResponse {
 }
 
 export class ShowVoteChoiceResponse {
+  declare isNominated?: boolean;
   declare bio?: string | null;
   declare desktopPicture?: string | null;
   declare mobilePicture?: string | null;
@@ -100,6 +101,7 @@ export class ShowVoteChoiceResponse {
     if (source.bio !== undefined) response.bio = nullable(source.bio, string, `${path}.bio`);
     if (source.desktopPicture !== undefined) response.desktopPicture = nullable(source.desktopPicture, string, `${path}.desktopPicture`);
     if (source.mobilePicture !== undefined) response.mobilePicture = nullable(source.mobilePicture, string, `${path}.mobilePicture`);
+    if (source.isNominated !== undefined) response.isNominated = boolean(source.isNominated, `${path}.isNominated`);
     if (source.eliminatedRound !== undefined) response.eliminatedRound = nullable(source.eliminatedRound, EliminatedRoundResponse.decode, `${path}.eliminatedRound`);
     if (source.reintroducedRound !== undefined) response.reintroducedRound = nullable(source.reintroducedRound, ReintroducedRoundResponse.decode, `${path}.reintroducedRound`);
     return response;
