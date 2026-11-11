@@ -1,5 +1,6 @@
 {
   "DVLIVE_MODE": "PROD",
+  "DVLIVE_API_TOKEN": "<api-token>",
   "DVLIVE_ENV": "STAG",
   "DVLIVE_ALB_TOKEN_DEV": "",
   "DVLIVE_ALB_TOKEN_STAG": "",

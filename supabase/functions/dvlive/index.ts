@@ -188,24 +188,25 @@ async function handleRequestWithEnv(
     }
 
     const dvliveMode = env("DVLIVE_MODE")?.trim() ?? "PROD";
-    const albToken = dvliveMode === "LOCAL"
+    const albToken = dvliveMode === "INT"
       ? undefined
       : trimSecret(env(`DVLIVE_ALB_TOKEN_${dvliveEnv}`)) || undefined;
 
     let api: ApiService;
     try {
-      const localToken = dvliveMode === "LOCAL" ? trimSecret(env("LOCAL_DVLIVE_API_TOKEN")) : undefined;
-      if (dvliveMode === "LOCAL" && !localToken) {
-        throw new TypeError("LOCAL_DVLIVE_API_TOKEN is required in LOCAL mode.");
+      const apiToken = trimSecret(env("DVLIVE_API_TOKEN"));
+      if (!apiToken) {
+        throw new TypeError("DVLIVE_API_TOKEN is required.");
       }
       api = new ApiService({
         environment: dvliveEnv,
         mode: dvliveMode,
         logEnable: env("DVLIVE_LOG_ENABLE"),
         logLevel: env("DVLIVE_LOG_LEVEL"),
-        headers: dvliveMode === "LOCAL"
-          ? { Authorization: `Bearer ${localToken}` }
-          : albToken ? { "X-Internal-Auth": albToken } : undefined,
+        headers: {
+          Authorization: `Bearer ${apiToken}`,
+          ...(albToken ? { "X-Internal-Auth": albToken } : {}),
+        },
       });
     } catch (err) {
       console.error(`${tag} ${ts} | invalid SDK config:`, err instanceof Error ? err.message : err);

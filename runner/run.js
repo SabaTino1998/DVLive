@@ -128,7 +128,7 @@ function printHelpDetail(name) {
   console.log(`Client:  ${entry.client}`);
   console.log('\nRequired config:');
   if (entry.config.length === 0) {
-    console.log('  (none beyond DVLIVE_MODE, DVLIVE_ENV and its mode-specific authentication)');
+    console.log('  (none beyond DVLIVE_MODE, DVLIVE_ENV and DVLIVE_API_TOKEN and optional PROD ALB token)');
   } else {
     for (const key of entry.config) console.log(`  ${key}`);
   }
@@ -185,12 +185,16 @@ function loadConfig() {
     throw new Error(`config.json is not valid JSON: ${err.message}`);
   }
   cfg.DVLIVE_MODE = (process.env.DVLIVE_MODE ?? cfg.DVLIVE_MODE ?? 'PROD').trim();
-  if (!['LOCAL', 'PROD'].includes(cfg.DVLIVE_MODE)) {
-    throw new Error('config.DVLIVE_MODE must be LOCAL or PROD');
+  if (!['INT', 'PROD'].includes(cfg.DVLIVE_MODE)) {
+    throw new Error('config.DVLIVE_MODE must be INT or PROD');
   }
   cfg.DVLIVE_ENV = (process.env.DVLIVE_ENV ?? cfg.DVLIVE_ENV)?.trim();
   if (!['DEV', 'STAG', 'PROD'].includes(cfg.DVLIVE_ENV)) {
     throw new Error('config.DVLIVE_ENV must be DEV, STAG or PROD');
+  }
+  cfg.DVLIVE_API_TOKEN = (process.env.DVLIVE_API_TOKEN ?? cfg.DVLIVE_API_TOKEN)?.trim();
+  if (!cfg.DVLIVE_API_TOKEN) {
+    throw new Error('config.DVLIVE_API_TOKEN is required');
   }
   return cfg;
 }
@@ -364,7 +368,7 @@ function reportError(err) {
       console.error(`  body       : ${bodyStr}`);
     }
     if (err instanceof DvliveAuthError) {
-      console.error('  → Check DVLIVE_MODE and, in PROD mode, DVLIVE_ALB_TOKEN_<environment> in config.json or the environment.');
+      console.error('  → Check DVLIVE_API_TOKEN, DVLIVE_MODE and, in PROD mode, DVLIVE_ALB_TOKEN_<environment> in config.json or the environment.');
     }
     if (
       err instanceof DvliveConflictError &&
@@ -392,16 +396,16 @@ async function main() {
   const action = resolveAction(cfg);
 
   const tokenKey = `DVLIVE_ALB_TOKEN_${cfg.DVLIVE_ENV}`;
-  const albToken = cfg.DVLIVE_MODE === 'LOCAL'
+  const albToken = cfg.DVLIVE_MODE === 'INT'
     ? undefined
     : (process.env[tokenKey] ?? cfg[tokenKey])?.trim() || undefined;
-  const client = new DvliveClient({ environment: cfg.DVLIVE_ENV, mode: cfg.DVLIVE_MODE, albToken });
+  const client = new DvliveClient({ environment: cfg.DVLIVE_ENV, mode: cfg.DVLIVE_MODE, apiToken: cfg.DVLIVE_API_TOKEN, albToken });
 
   console.log('DV Live web show engine — reference runner');
   console.log(`  mode    : ${cfg.DVLIVE_MODE}`);
   console.log(`  baseUrl : ${client.baseUrl}`);
   console.log(
-    `  auth    : ${cfg.DVLIVE_MODE === 'LOCAL' ? 'Bearer dev-auth-token' : albToken ? 'X-Internal-Auth (token set)' : '(none)'}`,
+    `  auth    : Bearer (token set)${albToken ? ' + X-Internal-Auth (token set)' : ''}`,
   );
   console.log(`  action  : ${action}`);
   console.log('');

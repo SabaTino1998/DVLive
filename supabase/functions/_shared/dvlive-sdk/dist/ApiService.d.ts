@@ -5,7 +5,7 @@ import { CastVoteResult, CreateVoterResult, Voter } from "./models/voter.ts";
 import type { GetVoterInput, CreateVoterInput, CastVoteInput } from "./requests/voter.ts";
 export interface ApiServiceConfig {
     environment: string | undefined;
-    /** LOCAL uses internal hosts; PROD (default) uses external hosts. */
+    /** INT uses internal hosts; PROD (default) uses external hosts. */
     mode?: string;
     headers?: Record<string, string> | (() => Record<string, string>);
     timeoutMs?: number;

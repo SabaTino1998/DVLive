@@ -16,17 +16,19 @@ It mirrors the Smart Journey reference runner (`smart-journey/runner/`): one HTT
    cp config.example.json config.json
    ```
 
-2. Set `DVLIVE_MODE` to `LOCAL` or `PROD` (default when absent).
-   `LOCAL` uses the internal `int-` hosts with `Authorization: Bearer dev-auth-token`
-   and ignores ALB tokens. In `PROD`, set `DVLIVE_ENV` to `DEV`, `STAG` or `PROD` and the matching
-   `DVLIVE_ALB_TOKEN_<environment>`. The runner selects the external host and
-   sends only `X-Internal-Auth` in `PROD`; a missing or blank token omits the header.
+2. Set `DVLIVE_MODE` to `INT` or `PROD` (default when absent).
+   Set `DVLIVE_ENV` to `DEV`, `STAG` or `PROD` and provide a nonblank
+   `DVLIVE_API_TOKEN`, always sent as `Authorization: Bearer <DVLIVE_API_TOKEN>`.
+   `INT` uses the internal `int-` hosts and ignores ALB tokens.
+   `PROD` selects the external host and also sends `X-Internal-Auth` when the
+   matching `DVLIVE_ALB_TOKEN_<environment>` is nonblank.
    Environment variables override these JSON settings.
 
    ```json
    {
      "DVLIVE_MODE": "PROD",
      "DVLIVE_ENV": "STAG",
+     "DVLIVE_API_TOKEN": "…",
      "DVLIVE_ALB_TOKEN_STAG": "…",
      "action": "getShowVote",
      "showVote": { "uuid": "…" }
@@ -56,8 +58,9 @@ Each run prints a curl command including the actual authentication value, the ca
 
 | Key | Type | Required | Description |
 | --- | --- | --- | --- |
-| `DVLIVE_MODE` | string | no | `LOCAL` or `PROD`; defaults to `PROD`. Invalid values fail configuration. |
+| `DVLIVE_MODE` | string | no | `INT` or `PROD`; defaults to `PROD`. Invalid values fail configuration. |
 | `DVLIVE_ENV` | string | yes | `DEV`, `STAG` or `PROD`; selects the API environment independently of access mode. |
+| `DVLIVE_API_TOKEN` | string | yes | Nonblank bearer token required in both INT and PROD modes. |
 | `DVLIVE_ALB_TOKEN_DEV` | string | no | DEV `X-Internal-Auth` token in `PROD` mode. |
 | `DVLIVE_ALB_TOKEN_STAG` | string | no | STAG `X-Internal-Auth` token in `PROD` mode. |
 | `DVLIVE_ALB_TOKEN_PROD` | string | no | PROD `X-Internal-Auth` token in `PROD` mode. |

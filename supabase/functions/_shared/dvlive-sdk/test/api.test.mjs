@@ -220,14 +220,14 @@ test("unmappable nested responses retain HTTP context in ApiResponseError", asyn
 test("access mode selects internal or external hosts independently from environment", async t => {
   const capture = t.mock.method(globalThis, "fetch", async () => Response.json(show));
   for (const environment of ["DEV", "STAG", "PROD"]) {
-    for (const mode of [undefined, "PROD", "LOCAL"]) {
+    for (const mode of [undefined, "PROD", "INT"]) {
       await new ApiService({ environment, mode }).getShowVote("show");
       const prefix = environment === "PROD" ? "" : `${environment.toLowerCase()}-`;
       assert.equal(capture.mock.calls.at(-1).arguments[0].hostname,
-        `${mode === "LOCAL" ? "int-" : ""}${prefix}webshow-engine.dv-live.com`);
+        `${mode === "INT" ? "int-" : ""}${prefix}webshow-engine.dv-live.com`);
     }
   }
-  for (const mode of ["", "local", "INVALID", null]) {
+  for (const mode of ["", "LOCAL", "int", "INVALID", null]) {
     assert.throws(() => new ApiService({ environment: "STAG", mode }), /mode must be/);
   }
   assert.equal(capture.mock.callCount(), 9);

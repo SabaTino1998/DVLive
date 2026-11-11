@@ -19,7 +19,7 @@ interface HttpResponse extends ApiResponse<unknown> {
 
 export interface ApiServiceConfig {
   environment: string | undefined;
-  /** LOCAL uses internal hosts; PROD (default) uses external hosts. */
+  /** INT uses internal hosts; PROD (default) uses external hosts. */
   mode?: string;
   headers?: Record<string, string> | (() => Record<string, string>);
   timeoutMs?: number;
