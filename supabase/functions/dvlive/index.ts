@@ -90,6 +90,30 @@ async function parseRequestBody(req: Request, action: ApiModeDefinition, mode: A
   }
 }
 
+/** Enrich a choice with the authenticated voter's balance and its show's current round. */
+export async function getCandidateDetail(
+  api: Pick<ApiService, "getShowVoteChoice" | "getVoter" | "getShowVote">,
+  uuid: string,
+  userRef: string,
+) {
+  const choice = await api.getShowVoteChoice(uuid);
+  const showVoteUuid = choice.data.showVoteUuid;
+  const [voter, show] = await Promise.all([
+    api.getVoter({ showVoteUuid, userRef }),
+    api.getShowVote(showVoteUuid),
+  ]);
+  const round = show.data.round;
+  return {
+    ...choice,
+    data: {
+      ...choice.data,
+      balance: voter.data.balance,
+      remainingPoints: voter.data.remainingPoints,
+      round: round ? { startDay: round.startDay, endDay: round.endDay } : null,
+    },
+  };
+}
+
 function callApi(
   api: ApiService,
   mode: ApiModes,
@@ -104,7 +128,7 @@ function callApi(
     case ApiModes.GetShowVote:
       return api.getShowVote(uuid);
     case ApiModes.GetShowVoteChoice:
-      return api.getShowVoteChoice(uuid);
+      return getCandidateDetail(api, uuid, userRef);
     case ApiModes.GetVoter:
       return api.getVoter({ showVoteUuid, userRef });
     case ApiModes.CreateVoter:
@@ -179,6 +203,7 @@ async function handleRequestWithEnv(
     }
 
     const needsUser =
+      mode === ApiModes.GetShowVoteChoice ||
       mode === ApiModes.GetVoter ||
       mode === ApiModes.CreateVoter ||
       mode === ApiModes.CastVote;

@@ -152,3 +152,87 @@ test('CLI selects JSON tokens and rejects missing or blank selected tokens witho
     }
   }
 });
+
+for (const round of [null, { startDay: '2026-11-01', endDay: '2026-11-30', choices: [], name: 'Round' }]) {
+  test(`candidate detail composes choice, voter and ${round ? 'round dates' : 'null round'}`, async t => {
+    t.mock.method(console, 'log', () => {});
+    const choice = { uuid: 'choice/id', showVoteUuid: 'show/id', firstname: 'First', lastname: 'Last', status: 'ACTIVE', order: 1 };
+    const balance = { standardPoint: 3, additionalPoint: 2, purchasedPoint: 1 };
+    const capture = t.mock.method(globalThis, 'fetch', async url => {
+      if (url.pathname === '/show-vote-choice/choice%2Fid') return Response.json(choice);
+      if (url.pathname === '/show-vote/show%2Fid/voter/user%2Fref') return Response.json({ balance, remainingPoints: 6 });
+      assert.equal(url.pathname, '/show-vote/show%2Fid');
+      return Response.json({ round });
+    });
+    const client = new DvliveClient({ environment: 'STAG', apiToken: 'token' });
+    assert.deepEqual(await client.showVoteChoices.get('choice/id', ' user/ref '), {
+      ...choice, balance, remainingPoints: 6,
+      round: round ? { startDay: round.startDay, endDay: round.endDay } : null,
+    });
+    assert.equal(capture.mock.callCount(), 3);
+  });
+}
+
+test('candidate detail requires a voter reference before fetching', async t => {
+  const capture = t.mock.method(globalThis, 'fetch', async () => Response.json({}));
+  const client = new DvliveClient({ environment: 'STAG', apiToken: 'token' });
+  for (const userRef of [undefined, '', '   ']) {
+    await assert.rejects(client.showVoteChoices.get('choice', userRef), /userRef is required/);
+  }
+  assert.equal(capture.mock.callCount(), 0);
+});
+
+for (const failingPath of ['/show-vote-choice/choice', '/show-vote/show/voter/user', '/show-vote/show']) {
+  test(`candidate detail propagates upstream failure from ${failingPath}`, async t => {
+    t.mock.method(console, 'log', () => {});
+    const capture = t.mock.method(globalThis, 'fetch', async url => {
+      if (url.pathname === failingPath) return Response.json({ message: 'Missing resource', code: 404 }, { status: 404 });
+      if (url.pathname.startsWith('/show-vote-choice/')) return Response.json({ showVoteUuid: 'show' });
+      return Response.json({ balance: {}, remainingPoints: 0, round: null });
+    });
+    const client = new DvliveClient({ environment: 'STAG', apiToken: 'token' });
+    await assert.rejects(client.showVoteChoices.get('choice', 'user'), err => err.statusCode === 404 && err.body.message === 'Missing resource');
+    assert.equal(capture.mock.callCount(), failingPath.startsWith('/show-vote-choice/') ? 1 : 3);
+  });
+}
+
+test('candidate CLI uses configured voter reference and prints enriched fields', t => {
+  const { mkdtempSync, writeFileSync, copyFileSync, rmSync } = require('node:fs');
+  const { tmpdir } = require('node:os');
+  const { join } = require('node:path');
+  const { spawnSync } = require('node:child_process');
+  const directory = mkdtempSync(join(tmpdir(), 'dvlive-candidate-cli-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  for (const file of ['run.js', 'dvliveClient.js']) copyFileSync(join(__dirname, '..', file), join(directory, file));
+  const mock = join(directory, 'fetch.cjs');
+  writeFileSync(mock, `
+    const assert = require('node:assert/strict');
+    let calls = 0;
+    global.fetch = async url => {
+      calls++;
+      if (url.pathname === '/show-vote-choice/choice') return Response.json({uuid:'choice',showVoteUuid:'actual-show'});
+      if (url.pathname === '/show-vote/actual-show/voter/configured-user') return Response.json({balance:{standardPoint:4},remainingPoints:4});
+      assert.equal(url.pathname, '/show-vote/actual-show');
+      return Response.json({round:{startDay:'start',endDay:'end',name:'hidden'}});
+    };
+    process.on('exit', () => assert.equal(calls, process.env.EXPECTED_CALLS === '0' ? 0 : 3));
+  `);
+  for (const userRef of ['configured-user', undefined]) {
+    writeFileSync(join(directory, 'config.json'), JSON.stringify({
+      DVLIVE_ENV: 'STAG', DVLIVE_API_TOKEN_STAG: 'test-token',
+      showVoteChoice: { uuid: 'choice', userRef },
+    }));
+    const result = spawnSync(process.execPath, ['--require', mock, join(directory, 'run.js'), 'getShowVoteChoice'], {
+      env: { ...process.env, DVLIVE_MODE: 'PROD', DVLIVE_ENV: 'STAG', DVLIVE_API_TOKEN_STAG: 'test-token', EXPECTED_CALLS: userRef ? '3' : '0' },
+      encoding: 'utf8',
+    });
+    assert.equal(result.status, userRef ? 0 : 1, result.stderr);
+    if (userRef) {
+      assert.match(result.stdout, /remainingPoints=4/);
+      assert.match(result.stdout, /balance=\{"standardPoint":4\}/);
+      assert.match(result.stdout, /round=\{"startDay":"start","endDay":"end"\}/);
+    } else {
+      assert.match(result.stderr, /Missing required field "showVoteChoice.userRef"/);
+    }
+  }
+});

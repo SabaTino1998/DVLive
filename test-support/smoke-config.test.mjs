@@ -109,3 +109,40 @@ print('201',end='')
     }
   }
 });
+
+test('candidate smoke requires enriched balance, points and nullable round dates using app JWT', t => {
+  const f = fixture(t);
+  writeFileSync(join(f.directory, 'curl'), `#!/usr/bin/env python3
+import sys,json,os
+a=sys.argv[1:]
+open(os.environ['CAPTURE'],'w').write(json.dumps(a))
+open(a[a.index('--output')+1],'w').write(os.environ['MOCK_RESPONSE'])
+print('200',end='')
+`, { mode: 0o755 });
+  const choice = { uuid: 'choice', showVoteUuid: 'show', firstname: 'First', lastname: 'Last', status: 'ACTIVE', order: 1 };
+  const enriched = { ...choice, balance: { standardPoint: 0 }, remainingPoints: 0, round: null };
+  const missing = key => Object.fromEntries(Object.entries(enriched).filter(([name]) => name !== key));
+  for (const [data, valid] of [
+    [enriched, true],
+    [{ ...enriched, round: { startDay: '2026-11-01', endDay: '2026-11-30' } }, true],
+    [choice, false],
+    [missing('round'), false],
+    [missing('balance'), false],
+    [missing('remainingPoints'), false],
+    [{ ...enriched, balance: null }, false],
+    [{ ...enriched, remainingPoints: '0' }, false],
+    [{ ...enriched, round: {} }, false],
+    [{ ...enriched, round: { startDay: 'start', endDay: null } }, false],
+  ]) {
+    const result = spawnSync('bash', ['script/smoke-get-show-vote-choice.sh'], {
+      cwd: root, encoding: 'utf8',
+      env: { ...f.environment, APP_JWT: 'app-jwt', CHOICE_UUID: 'choice/id', MOCK_RESPONSE: JSON.stringify({ ok: true, data }) },
+    });
+    assert.equal(result.status, valid ? 0 : 1, result.stderr);
+    const args = JSON.parse(readFileSync(f.environment.CAPTURE, 'utf8'));
+    assert.ok(args.includes('Authorization: Bearer app-jwt'));
+    const url = new URL(args.at(-1));
+    assert.equal(url.searchParams.get('uuid'), 'choice/id');
+    assert.equal(url.searchParams.has('userRef'), false);
+  }
+});

@@ -10,4 +10,5 @@ source "$(cd "$(dirname "$0")" && pwd)/smoke-dvlive-common.sh"
 PARAMS=$(jq -n --arg uuid "$CHOICE_UUID" '{uuid:$uuid}')
 dvlive_request getShowVoteChoice GET "$PARAMS"
 dvlive_assert 'has("uuid") and has("showVoteUuid") and (.firstname | type == "string") and (.lastname | type == "string") and (.status | type == "string") and (.order | type == "number")' 'expected ShowVoteChoiceResponse'
+dvlive_assert '(.balance | type == "object") and (.remainingPoints | type == "number") and has("round") and (.round == null or ((.round | type == "object") and (.round.startDay | type == "string") and (.round.endDay | type == "string")))' 'expected candidate balance, remainingPoints and nullable round dates'
 dvlive_output getShowVoteChoice

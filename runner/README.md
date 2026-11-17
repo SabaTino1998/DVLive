@@ -44,7 +44,7 @@ It mirrors the Smart Journey reference runner (`smart-journey/runner/`): one HTT
 npm run help               # summary of all actions
 npm run help -- getVoter   # detail for one action
 
-npm run getShowVoteChoice  # GET  /show-vote-choice/{uuid}
+npm run getShowVoteChoice  # participant + voter balance + current round (3 GETs)
 npm run getShowVote        # GET  /show-vote/{uuid}
 npm run createVoter        # POST /show-vote/{uuid}/voter
 npm run getVoter           # GET  /show-vote/{uuid}/voter/{userRef}
@@ -70,6 +70,7 @@ Each run prints a curl command including the actual authentication value, the ca
 | `action` | string | no | Default action; overridden by CLI arg. |
 | `showVote.uuid` | string | yes for `getShowVote` | Show vote UUID. |
 | `showVoteChoice.uuid` | string | yes for `getShowVoteChoice` | Choice/participant UUID. |
+| `showVoteChoice.userRef` | string | yes for `getShowVoteChoice` | Voter reference used to fetch the balance. |
 | `createVoter.showVoteUuid` | string | yes for `createVoter` | Path UUID. |
 | `createVoter.email` | string | no | Request body. |
 | `createVoter.phone` | string | no | Request body. |
@@ -91,11 +92,20 @@ For POST actions, path fields (`showVoteUuid`, `userRef`) are stripped from the 
 
 | Action | HTTP | Method on client |
 | --- | --- | --- |
-| `getShowVoteChoice` | `GET /show-vote-choice/{uuid}` | `client.showVoteChoices.get(uuid)` |
+| `getShowVoteChoice` | `GET /show-vote-choice/{uuid}` | `client.showVoteChoices.get(uuid, userRef)` |
 | `getShowVote` | `GET /show-vote/{uuid}` | `client.showVotes.get(uuid)` |
 | `createVoter` | `POST /show-vote/{uuid}/voter` | `client.voters.create(showVoteUuid, body)` |
 | `getVoter` | `GET /show-vote/{uuid}/voter/{userRef}` | `client.voters.get(showVoteUuid, userRef)` |
 | `castVote` | `POST .../vote` | `client.voters.castVote(showVoteUuid, uniqRef, body)` |
+
+`getShowVoteChoice` composes three upstream GET requests: it fetches the choice,
+then fetches the voter and show in parallel using the returned `showVoteUuid`.
+Set `showVoteChoice.userRef` to the voter reference (the same `absolute_reference`
+used by the app JWT when calling the Edge Function). The result adds `balance`,
+`remainingPoints`, and `round: { startDay, endDay }` or `null` when no round exists.
+Any upstream failure fails the action. The runner calls upstream directly, so it
+requires the reference in configuration; the Edge Function derives it from the
+verified JWT. `openapi.json` describes the individual upstream endpoints.
 
 ## Files
 

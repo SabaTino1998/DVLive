@@ -27,10 +27,10 @@ const ACTION_REGISTRY = {
   getShowVoteChoice: {
     group: 'showVote',
     http: 'GET /show-vote-choice/{uuid}',
-    client: 'client.showVoteChoices.get(uuid)',
-    config: ['showVoteChoice.uuid'],
+    client: 'client.showVoteChoices.get(uuid, userRef)',
+    config: ['showVoteChoice.uuid', 'showVoteChoice.userRef'],
     optional: [],
-    summary: 'Get a show vote choice (participant) by UUID',
+    summary: 'Get participant details, voter balance and current round dates (three upstream GETs)',
   },
   getShowVote: {
     group: 'showVote',
@@ -97,7 +97,7 @@ function findSimilarActions(name) {
 function printHelpSummary() {
   console.log('DV Live web show engine — reference runner\n');
   console.log('Usage:');
-  console.log('  npm run <action>          run one API call using config.json');
+  console.log('  npm run <action>          run one action using config.json');
   console.log('  npm run help              this summary');
   console.log('  npm run help -- <action>  detail for one action\n');
 
@@ -260,10 +260,10 @@ function printNbVoteRemaining(res) {
 }
 
 async function runGetShowVoteChoice(client, cfg) {
-  require_(cfg.showVoteChoice, ['uuid'], 'showVoteChoice');
-  const { uuid } = cfg.showVoteChoice;
-  printHeader('showVoteChoices.get', { uuid });
-  const res = await client.showVoteChoices.get(uuid);
+  require_(cfg.showVoteChoice, ['uuid', 'userRef'], 'showVoteChoice');
+  const { uuid, userRef } = cfg.showVoteChoice;
+  printHeader('showVoteChoices.get', { uuid, userRef });
+  const res = await client.showVoteChoices.get(uuid, userRef);
   console.log(JSON.stringify(res, null, 2));
   printPayloadTable(
     [
@@ -273,9 +273,12 @@ async function runGetShowVoteChoice(client, cfg) {
         lastname: res?.lastname,
         status: res?.status,
         order: res?.order,
+        balance: res?.balance,
+        remainingPoints: res?.remainingPoints,
+        round: res?.round,
       },
     ],
-    ['uuid', 'firstname', 'lastname', 'status', 'order'],
+    ['uuid', 'firstname', 'lastname', 'status', 'order', 'balance', 'remainingPoints', 'round'],
   );
   return res;
 }

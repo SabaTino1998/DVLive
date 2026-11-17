@@ -101,7 +101,7 @@ node --test test-support/smartuser.test.mjs
 | Script | Mode | Controllo |
 | --- | --- | --- |
 | `smoke-get-show-vote.sh` | `getShowVote` | Nome, date e round opzionale dello show |
-| `smoke-get-show-vote-choice.sh` | `getShowVoteChoice` | UUID, show, nome, stato e ordine del partecipante |
+| `smoke-get-show-vote-choice.sh` | `getShowVoteChoice` | UUID, show, nome, stato, ordine, saldo, punti rimanenti e date del round (oppure `round: null`) |
 | `smoke-get-voter.sh` | `getVoter` | Riferimento, punti, stato antifrode e saldo |
 | `smoke-create-voter.sh` | `createVoter` | HTTP 201 ed esito registrazione |
 | `smoke-add-vote.sh` | DV Live diretto, senza Supabase | HTTP 201 ed esito accredito |
@@ -213,3 +213,5 @@ npm ci --prefix test-support
 npm --prefix test-support run check
 npm --prefix test-support test
 ```
+
+`getShowVoteChoice` usa `absolute_reference` del JWT verificato per recuperare saldo e punti del votante. Le date `round.startDay` e `round.endDay` provengono dallo show del partecipante; senza round, `round` è `null`. Il votante deve esistere per quello show; un errore in una delle tre chiamate upstream fa fallire lo smoke test. Non serve passare `userRef` nella query.

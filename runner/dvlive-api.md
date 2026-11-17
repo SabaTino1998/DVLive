@@ -42,7 +42,7 @@ npm run getShowVote
 
 | Action | HTTP | Client |
 | --- | --- | --- |
-| `getShowVoteChoice` | `GET /show-vote-choice/{uuid}` | `client.showVoteChoices.get(uuid)` |
+| `getShowVoteChoice` | `GET /show-vote-choice/{uuid}` | `client.showVoteChoices.get(uuid, userRef)` |
 | `getShowVote` | `GET /show-vote/{uuid}` | `client.showVotes.get(uuid)` |
 | `createVoter` | `POST /show-vote/{uuid}/voter` | `client.voters.create(showVoteUuid, body)` |
 | `getVoter` | `GET /show-vote/{uuid}/voter/{userRef}` | `client.voters.get(showVoteUuid, userRef)` |
@@ -51,6 +51,15 @@ npm run getShowVote
 Path parameter `userRef` / `uniqRef` is the voter’s `uniqRef` from `CreateVoterRequest`.
 
 ---
+
+`getShowVoteChoice` composes three upstream GET requests: it fetches the choice,
+then fetches the voter and show in parallel using the returned `showVoteUuid`.
+Set `showVoteChoice.userRef` to the voter reference (the same `absolute_reference`
+used by the app JWT when calling the Edge Function). The result adds `balance`,
+`remainingPoints`, and `round: { startDay, endDay }` or `null` when no round exists.
+Any upstream failure fails the action. The runner calls upstream directly, so it
+requires the reference in configuration; the Edge Function derives it from the
+verified JWT. `openapi.json` describes the individual upstream endpoints.
 
 ## Error envelope
 

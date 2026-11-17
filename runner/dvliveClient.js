@@ -93,9 +93,22 @@ class DvliveClient {
     this.albToken = mode === 'INT' ? undefined : albToken?.trim() || undefined;
 
     this.showVoteChoices = {
-      get: (uuid) => {
+      get: async (uuid, userRef) => {
         if (!uuid) throw new Error('showVoteChoices.get: uuid is required');
-        return this.request('GET', `/show-vote-choice/${encodeURIComponent(uuid)}`);
+        if (typeof userRef !== 'string' || !userRef.trim()) {
+          throw new Error('showVoteChoices.get: userRef is required');
+        }
+        const choice = await this.request('GET', `/show-vote-choice/${encodeURIComponent(uuid)}`);
+        const [voter, show] = await Promise.all([
+          this.voters.get(choice.showVoteUuid, userRef.trim()),
+          this.showVotes.get(choice.showVoteUuid),
+        ]);
+        return {
+          ...choice,
+          balance: voter.balance,
+          remainingPoints: voter.remainingPoints,
+          round: show.round ? { startDay: show.round.startDay, endDay: show.round.endDay } : null,
+        };
       },
     };
 
