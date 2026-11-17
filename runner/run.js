@@ -128,7 +128,7 @@ function printHelpDetail(name) {
   console.log(`Client:  ${entry.client}`);
   console.log('\nRequired config:');
   if (entry.config.length === 0) {
-    console.log('  (none beyond DVLIVE_MODE, DVLIVE_ENV and DVLIVE_API_TOKEN and optional PROD ALB token)');
+    console.log('  (none beyond DVLIVE_MODE, DVLIVE_ENV and DVLIVE_API_TOKEN_<environment> and optional PROD ALB token)');
   } else {
     for (const key of entry.config) console.log(`  ${key}`);
   }
@@ -192,9 +192,10 @@ function loadConfig() {
   if (!['DEV', 'STAG', 'PROD'].includes(cfg.DVLIVE_ENV)) {
     throw new Error('config.DVLIVE_ENV must be DEV, STAG or PROD');
   }
-  cfg.DVLIVE_API_TOKEN = (process.env.DVLIVE_API_TOKEN ?? cfg.DVLIVE_API_TOKEN)?.trim();
-  if (!cfg.DVLIVE_API_TOKEN) {
-    throw new Error('config.DVLIVE_API_TOKEN is required');
+  const apiTokenKey = `DVLIVE_API_TOKEN_${cfg.DVLIVE_ENV}`;
+  cfg.apiToken = (process.env[apiTokenKey] ?? cfg[apiTokenKey])?.trim();
+  if (!cfg.apiToken) {
+    throw new Error(`config.${apiTokenKey} is required`);
   }
   return cfg;
 }
@@ -368,7 +369,7 @@ function reportError(err) {
       console.error(`  body       : ${bodyStr}`);
     }
     if (err instanceof DvliveAuthError) {
-      console.error('  → Check DVLIVE_API_TOKEN, DVLIVE_MODE and, in PROD mode, DVLIVE_ALB_TOKEN_<environment> in config.json or the environment.');
+      console.error('  → Check DVLIVE_API_TOKEN_<environment>, DVLIVE_MODE and, in PROD mode, DVLIVE_ALB_TOKEN_<environment> in config.json or the environment.');
     }
     if (
       err instanceof DvliveConflictError &&
@@ -399,7 +400,7 @@ async function main() {
   const albToken = cfg.DVLIVE_MODE === 'INT'
     ? undefined
     : (process.env[tokenKey] ?? cfg[tokenKey])?.trim() || undefined;
-  const client = new DvliveClient({ environment: cfg.DVLIVE_ENV, mode: cfg.DVLIVE_MODE, apiToken: cfg.DVLIVE_API_TOKEN, albToken });
+  const client = new DvliveClient({ environment: cfg.DVLIVE_ENV, mode: cfg.DVLIVE_MODE, apiToken: cfg.apiToken, albToken });
 
   console.log('DV Live web show engine — reference runner');
   console.log(`  mode    : ${cfg.DVLIVE_MODE}`);

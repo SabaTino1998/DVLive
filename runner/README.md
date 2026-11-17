@@ -18,17 +18,20 @@ It mirrors the Smart Journey reference runner (`smart-journey/runner/`): one HTT
 
 2. Set `DVLIVE_MODE` to `INT` or `PROD` (default when absent).
    Set `DVLIVE_ENV` to `DEV`, `STAG` or `PROD` and provide a nonblank
-   `DVLIVE_API_TOKEN`, always sent as `Authorization: Bearer <DVLIVE_API_TOKEN>`.
+   `DVLIVE_API_TOKEN_<environment>`, always sent as `Authorization: Bearer <selected-api-token>`.
    `INT` uses the internal `int-` hosts and ignores ALB tokens.
    `PROD` selects the external host and also sends `X-Internal-Auth` when the
    matching `DVLIVE_ALB_TOKEN_<environment>` is nonblank.
-   Environment variables override these JSON settings.
+   The suffix must match `DVLIVE_ENV`: `DVLIVE_API_TOKEN_DEV`,
+   `DVLIVE_API_TOKEN_STAG` or `DVLIVE_API_TOKEN_PROD`. Only that token is read;
+   the old `DVLIVE_API_TOKEN` key is ignored. Environment variables override
+   these JSON settings, including blank values (which fail validation).
 
    ```json
    {
      "DVLIVE_MODE": "PROD",
      "DVLIVE_ENV": "STAG",
-     "DVLIVE_API_TOKEN": "…",
+     "DVLIVE_API_TOKEN_STAG": "…",
      "DVLIVE_ALB_TOKEN_STAG": "…",
      "action": "getShowVote",
      "showVote": { "uuid": "…" }
@@ -60,7 +63,7 @@ Each run prints a curl command including the actual authentication value, the ca
 | --- | --- | --- | --- |
 | `DVLIVE_MODE` | string | no | `INT` or `PROD`; defaults to `PROD`. Invalid values fail configuration. |
 | `DVLIVE_ENV` | string | yes | `DEV`, `STAG` or `PROD`; selects the API environment independently of access mode. |
-| `DVLIVE_API_TOKEN` | string | yes | Nonblank bearer token required in both INT and PROD modes. |
+| `DVLIVE_API_TOKEN_<environment>` | string | yes | Nonblank bearer token required in both INT and PROD modes. |
 | `DVLIVE_ALB_TOKEN_DEV` | string | no | DEV `X-Internal-Auth` token in `PROD` mode. |
 | `DVLIVE_ALB_TOKEN_STAG` | string | no | STAG `X-Internal-Auth` token in `PROD` mode. |
 | `DVLIVE_ALB_TOKEN_PROD` | string | no | PROD `X-Internal-Auth` token in `PROD` mode. |

@@ -194,7 +194,7 @@ async function handleRequestWithEnv(
 
     let api: ApiService;
     try {
-      const apiToken = trimSecret(env("DVLIVE_API_TOKEN"));
+      const apiToken = trimSecret(env(`DVLIVE_API_TOKEN_${dvliveEnv}`));
       if (!apiToken) {
         throw new TypeError("DVLIVE_API_TOKEN is required.");
       }

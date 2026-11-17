@@ -16,7 +16,7 @@ function fixture(t) {
     EXPO_PUBLIC_SMARTUSER_APP_ID: 'test.bolt.app',
     EXPO_PUBLIC_SMARTUSER_SECRET: "special'\"$()<>|\\secret\n",
     EXPO_PUBLIC_SMARTUSER_ENV: 'STAG', SMART_USER_USERNAME: 'test@example.test',
-    SMART_USER_PASSWORD: '123456', DVLIVE_BEARER_TOKEN: 'test-bearer', SHOW_VOTE_UUID: 'json-show/a',
+    SMART_USER_PASSWORD: '123456', DVLIVE_ENV: 'STAG', DVLIVE_API_TOKEN_DEV: 'dev-bearer', DVLIVE_API_TOKEN_STAG: ' test-bearer ', DVLIVE_API_TOKEN_PROD: 'prod-bearer', SHOW_VOTE_UUID: 'json-show/a',
     SUPABASE_URL: 'http://supabase.test', SUPABASE_ANON_KEY: 'test-key',
   };
   const config = join(directory, 'config.json');
@@ -79,4 +79,33 @@ test('loader rejects invalid JSON and ignores unknown shell variable names', t =
   result = spawnSync('bash', ['-c', 'source script/smoke-config.sh; printf "%s" "$HOME"'], { cwd: root, env: f.environment, encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr);
   assert.notEqual(result.stdout, '/should-not-change');
+});
+
+test('direct add-vote selects only the matching environment token and rejects missing or blank values', t => {
+  const f = fixture(t);
+  writeFileSync(join(f.directory, 'curl'), `#!/usr/bin/env python3
+import sys,json,os
+a=sys.argv[1:]
+open(os.environ['CAPTURE'],'w').write(json.dumps(a))
+open(a[a.index('--output')+1],'w').write(json.dumps({'status':'success','code':201,'message':'Recorded'}))
+print('201',end='')
+`, { mode: 0o755 });
+  for (const [environment, host] of [['DEV', 'dev-webshow-engine.dv-live.com'], ['STAG', 'stag-webshow-engine.dv-live.com'], ['PROD', 'webshow-engine.dv-live.com']]) {
+    const key = `DVLIVE_API_TOKEN_${environment}`;
+    for (const token of [' selected-token ', undefined, '', ' \n\t ']) {
+      writeFileSync(f.config, JSON.stringify({ ...f.settings, DVLIVE_ENV: environment, DVLIVE_API_TOKEN: 'legacy-token', DVLIVE_BEARER_TOKEN: 'old-bearer', [key]: token }));
+      // Empty the capture so failure cases also prove curl was not invoked.
+      writeFileSync(f.environment.CAPTURE, '');
+      const result = spawnSync('bash', ['script/smoke-add-vote.sh'], { cwd: root, env: { ...f.environment, USER_REF: 'absolute-user' }, encoding: 'utf8' });
+      assert.equal(result.status, token?.trim() ? 0 : 1, result.stderr);
+      if (token?.trim()) {
+        const args = JSON.parse(readFileSync(f.environment.CAPTURE, 'utf8'));
+        assert.ok(args.includes('Authorization: Bearer selected-token'));
+        assert.equal(new URL(args.at(-1)).hostname, host);
+      } else {
+        assert.ok(result.stderr.includes(key));
+        assert.equal(readFileSync(f.environment.CAPTURE, 'utf8'), '');
+      }
+    }
+  }
 });

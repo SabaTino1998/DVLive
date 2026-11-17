@@ -13,7 +13,6 @@ OUT_FILE="${OUT_FILE:-}"
 
 # Direct DV Live configuration: no Supabase gateway or SDK.
 DVLIVE_ENV="${DVLIVE_ENV:-STAG}"
-DVLIVE_BEARER_TOKEN="${DVLIVE_BEARER_TOKEN:-}"
 
 command -v curl >/dev/null || { echo 'FAIL: curl required' >&2; exit 1; }
 command -v jq >/dev/null || { echo 'FAIL: jq required' >&2; exit 1; }
@@ -23,7 +22,11 @@ case "$DVLIVE_ENV" in
   PROD) DVLIVE_BASE_URL='https://webshow-engine.dv-live.com' ;;
   *) echo 'FAIL: DVLIVE_ENV must be DEV, STAG or PROD' >&2; exit 1 ;;
 esac
-[[ -n "$DVLIVE_BEARER_TOKEN" ]] || { echo 'FAIL: configure DVLIVE_BEARER_TOKEN in script/config.json' >&2; exit 1; }
+TOKEN_KEY="DVLIVE_API_TOKEN_$DVLIVE_ENV"
+API_TOKEN="${!TOKEN_KEY:-}"
+# Match the Edge Function: trim and require the selected environment's token.
+API_TOKEN="$(jq -rn --arg value "$API_TOKEN" '$value | gsub("^\\s+|\\s+$"; "")')"
+[[ -n "$API_TOKEN" ]] || { echo "FAIL: configure $TOKEN_KEY in script/config.json" >&2; exit 1; }
 [[ -n "$SHOW_VOTE_UUID" ]] || { echo 'FAIL: SHOW_VOTE_UUID required' >&2; exit 1; }
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/smoke-auth-common.sh"
 if [[ -z "$USER_REF" ]]; then sync_supabase_session; fi
@@ -44,7 +47,7 @@ trap 'rm -f "$TMP"' EXIT
 HTTP=$(curl --silent --show-error --connect-timeout 10 --max-time 60 \
   --request POST --output "$TMP" --write-out '%{http_code}' \
   --header 'Accept: application/json' \
-  --header "Authorization: Bearer $DVLIVE_BEARER_TOKEN" \
+  --header "Authorization: Bearer $API_TOKEN" \
   --header 'Content-Type: application/json' \
   --data-raw "$BODY" "$URL") || { echo 'FAIL: request failed' >&2; exit 1; }
 echo "URL: $DVLIVE_BASE_URL/show-vote/$SHOW_PATH/voter/[REDACTED]/add-vote"

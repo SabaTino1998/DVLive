@@ -48,8 +48,8 @@ when absent. Invalid values throw `TypeError`. Mode is independent of environmen
 | `PROD` | `https://int-webshow-engine.dv-live.com` |
 
 Authentication is supplied through `headers` by the application. Both the Edge
-Function and the runner require `DVLIVE_API_TOKEN` and send
-`Authorization: Bearer <DVLIVE_API_TOKEN>` in INT and PROD modes.
+Function and the runner require `DVLIVE_API_TOKEN_<environment>` and send
+`Authorization: Bearer <selected-api-token>` in INT and PROD modes.
 Only PROD also uses optional `X-Internal-Auth`; INT omits it.
 
 The URL mapping is maintained centrally in `src/environment.ts`.
@@ -345,7 +345,9 @@ prebuilt `dist/`. Set the Supabase environment file to:
 
 ```dotenv
 DVLIVE_MODE=PROD
-DVLIVE_API_TOKEN=<api-token>
+DVLIVE_API_TOKEN_DEV=
+DVLIVE_API_TOKEN_STAG=<stag-api-token>
+DVLIVE_API_TOKEN_PROD=
 DVLIVE_ENV=STAG
 # DVLIVE_ALB_TOKEN_DEV=<alb-token-for-dev-webshow-engine>
 # DVLIVE_ALB_TOKEN_STAG=<alb-token-for-stag-webshow-engine>
@@ -354,11 +356,11 @@ DVLIVE_ENV=STAG
 
 The Edge Function passes `DVLIVE_ENV` directly as `environment` to the SDK.
 It also passes `DVLIVE_MODE` as `mode`, defaulting to `PROD` when absent.
-In both modes, it requires a nonblank `DVLIVE_API_TOKEN` and sends it as a Bearer token.
+In both modes, it requires a nonblank `DVLIVE_API_TOKEN_<environment>` and sends it as a Bearer token.
 In PROD mode, it additionally reads only `DVLIVE_ALB_TOKEN_${DVLIVE_ENV}` and passes a non-blank value
 through `headers` as `X-Internal-Auth`; absent or blank values omit the header.
 In INT mode, it does not read ALB tokens and supplies only
-`Authorization: Bearer <DVLIVE_API_TOKEN>` through `headers`. The app JWT is
+`Authorization: Bearer <selected-api-token>` through `headers`. The app JWT is
 verified by the Edge Function and is never forwarded upstream.
 The SDK validates supported environments and selects the upstream base URL.
 Missing or invalid environment returns HTTP 500; the catalog remains available.

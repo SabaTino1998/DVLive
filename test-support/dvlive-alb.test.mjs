@@ -34,7 +34,7 @@ test('optional ALB token is selected directly by DVLIVE_ENV', async t => {
   const capture = t.mock.method(globalThis, 'fetch', async () => Response.json(show, { status: 200 }));
 
   const without = createHandler({
-    env: name => ({ DVLIVE_ENV: 'STAG', DVLIVE_API_TOKEN: ' api-token ', APP_JWT_SECRET: SECRET })[name],
+    env: name => ({ DVLIVE_ENV: 'STAG', DVLIVE_API_TOKEN_STAG: ' api-token ', APP_JWT_SECRET: SECRET })[name],
   });
   assert.equal((await without(request())).status, 200);
   assert.equal(capture.mock.calls[0].arguments[1].headers.get('Authorization'), 'Bearer api-token');
@@ -43,7 +43,7 @@ test('optional ALB token is selected directly by DVLIVE_ENV', async t => {
   const stag = createHandler({
     env: name => ({
       DVLIVE_ENV: 'STAG',
-      DVLIVE_API_TOKEN: ' api-token ', APP_JWT_SECRET: SECRET,
+      DVLIVE_API_TOKEN_STAG: ' api-token ', APP_JWT_SECRET: SECRET,
       DVLIVE_ALB_TOKEN_DEV: 'alb-dev-token',
       DVLIVE_ALB_TOKEN_STAG: 'alb-stag-token',
     })[name],
@@ -55,7 +55,7 @@ test('optional ALB token is selected directly by DVLIVE_ENV', async t => {
   const stagOnly = createHandler({
     env: name => ({
       DVLIVE_ENV: 'STAG',
-      DVLIVE_API_TOKEN: ' api-token ', APP_JWT_SECRET: SECRET,
+      DVLIVE_API_TOKEN_STAG: ' api-token ', APP_JWT_SECRET: SECRET,
       DVLIVE_ALB_TOKEN_STAG: 'alb-stag-token',
     })[name],
   });
@@ -65,7 +65,7 @@ test('optional ALB token is selected directly by DVLIVE_ENV', async t => {
   const prod = createHandler({
     env: name => ({
       DVLIVE_ENV: 'PROD',
-      DVLIVE_API_TOKEN: ' api-token ', APP_JWT_SECRET: SECRET,
+      DVLIVE_API_TOKEN_PROD: ' api-token ', APP_JWT_SECRET: SECRET,
       DVLIVE_ALB_TOKEN_PROD: 'alb-prod-token',
     })[name],
   });
@@ -77,7 +77,7 @@ test('optional ALB token is selected directly by DVLIVE_ENV', async t => {
   const blank = createHandler({
     env: name => ({
       DVLIVE_ENV: 'STAG',
-      DVLIVE_API_TOKEN: ' api-token ', APP_JWT_SECRET: SECRET,
+      DVLIVE_API_TOKEN_STAG: ' api-token ', APP_JWT_SECRET: SECRET,
       DVLIVE_ALB_TOKEN_DEV: '   ',
     })[name],
   });
@@ -98,7 +98,7 @@ for (const [environment, host] of [
       DVLIVE_ALB_TOKEN_DEV: ' dev-alb-token ',
       DVLIVE_ALB_TOKEN_STAG: ' stag-alb-token ',
       DVLIVE_ALB_TOKEN_PROD: ' prod-alb-token ',
-      DVLIVE_API_TOKEN: ' api-token ', APP_JWT_SECRET: SECRET,
+      [`DVLIVE_API_TOKEN_${environment}`]: ' api-token ', APP_JWT_SECRET: SECRET,
     };
     const reads = [];
     const handle = createHandler({ env: name => { reads.push(name); return secrets[name]; } });
@@ -125,17 +125,20 @@ for (const environment of ['DEV', 'STAG', 'PROD']) {
       const secrets = {
         DVLIVE_ENV: environment, DVLIVE_MODE: ` ${mode} `,
         APP_JWT_SECRET: SECRET, [`DVLIVE_ALB_TOKEN_${environment}`]: ' alb-token ',
-        DVLIVE_API_TOKEN: ' api-token ',
+        DVLIVE_API_TOKEN: 'legacy-token',
+        DVLIVE_API_TOKEN_DEV: ' dev-api-token ',
+        DVLIVE_API_TOKEN_STAG: ' stag-api-token ',
+        DVLIVE_API_TOKEN_PROD: ' prod-api-token ',
       };
       const handle = createHandler({ env: name => { reads.push(name); return secrets[name]; } });
       assert.equal((await handle(request())).status, 200);
       const [url, options] = capture.mock.calls[0].arguments;
       const prefix = environment === 'PROD' ? '' : `${environment.toLowerCase()}-`;
       assert.equal(url.hostname, `${mode === 'INT' ? 'int-' : ''}${prefix}webshow-engine.dv-live.com`);
-      assert.equal(options.headers.get('Authorization'), 'Bearer api-token');
+      assert.equal(options.headers.get('Authorization'), `Bearer ${environment.toLowerCase()}-api-token`);
       assert.equal(options.headers.get('X-Internal-Auth'), mode === 'PROD' ? 'alb-token' : null);
       if (mode === 'INT') assert.deepEqual(reads.filter(name => name.startsWith('DVLIVE_ALB_TOKEN_')), []);
-      assert.equal(reads.includes('DVLIVE_API_TOKEN'), true);
+      assert.deepEqual(reads.filter(name => name.startsWith('DVLIVE_API_TOKEN')), [`DVLIVE_API_TOKEN_${environment}`]);
     });
   }
 }
@@ -145,7 +148,7 @@ test('invalid access modes reject operations without upstream requests; catalog 
   const capture = t.mock.method(globalThis, 'fetch', async () => Response.json(show));
   for (const mode of ['', 'LOCAL', 'int', 'INVALID']) {
     const handle = createHandler({ env: name => ({
-      DVLIVE_ENV: 'STAG', DVLIVE_MODE: mode, DVLIVE_API_TOKEN: ' api-token ', APP_JWT_SECRET: SECRET,
+      DVLIVE_ENV: 'STAG', DVLIVE_MODE: mode, DVLIVE_API_TOKEN_STAG: ' api-token ', APP_JWT_SECRET: SECRET,
     })[name] });
     assert.equal((await handle(request())).status, 500);
     assert.equal((await handle(new Request('http://edge.test/dvlive'))).status, 200);
@@ -160,7 +163,8 @@ test('both modes require a nonblank configured bearer token before upstream requ
     for (const token of [undefined, '', '   ']) {
       const handle = createHandler({ env: name => ({
         DVLIVE_ENV: 'DEV', DVLIVE_MODE: mode, APP_JWT_SECRET: SECRET,
-        DVLIVE_API_TOKEN: token,
+        DVLIVE_API_TOKEN_DEV: token, DVLIVE_API_TOKEN_STAG: 'other-environment-token',
+        DVLIVE_API_TOKEN: 'legacy-token',
       })[name] });
       const response = await handle(request());
       assert.equal(response.status, 500);

@@ -43,9 +43,9 @@ Supabase JWT verification depends on `verify_jwt` in `supabase/config.toml`
 (currently `false`). Smoke tests still send the Supabase headers.
 Set `DVLIVE_ALB_TOKEN_DEV`, `DVLIVE_ALB_TOKEN_STAG`, `DVLIVE_ALB_TOKEN_PROD` (selected by `DVLIVE_ENV`) in `supabase/.env` or Supabase secrets. The function attaches the selected token
 as `X-Internal-Auth` to upstream requests in `DVLIVE_MODE=PROD` (default).
-`DVLIVE_API_TOKEN` is required in both modes and is always sent as `Authorization: Bearer <DVLIVE_API_TOKEN>`.
+`DVLIVE_API_TOKEN_<environment>` (DEV, STAG or PROD, selected by `DVLIVE_ENV`) is required in both modes and is always sent as `Authorization: Bearer <selected-api-token>`.
 With `DVLIVE_MODE=INT`, requests use the corresponding `int-` host and only
-`Authorization: Bearer <DVLIVE_API_TOKEN>`; ALB tokens are ignored. Clients send
+`Authorization: Bearer <selected-api-token>`; ALB tokens are ignored. Clients send
 `apikey` and `Authorization: Bearer <app access_token>` for all five commands;
 never send `bearer-token`. The catalog requires no JWT or server configuration.
 
@@ -135,7 +135,9 @@ the local DVLive bootstrap migration to an existing Bravigo database.
 
 ```dotenv
 DVLIVE_MODE=PROD
-DVLIVE_API_TOKEN=<api-token>
+DVLIVE_API_TOKEN_DEV=
+DVLIVE_API_TOKEN_STAG=<stag-api-token>
+DVLIVE_API_TOKEN_PROD=
 DVLIVE_ENV=STAG
 ```
 
@@ -233,9 +235,9 @@ No `export` is needed. For remote Supabase, set `SUPABASE_URL` and
 `SUPABASE_ANON_KEY` and SmartUser login configuration in `script/config.json`.
 Locally, the default URL is `http://127.0.0.1:54321`; the key is resolved
 as in `atom`: from the environment, then `supabase status -o json`, then the local demo key.
-The DV Live bearer token belongs in the server secret `DVLIVE_API_TOKEN`.
+The DV Live bearer token belongs in the server secret `DVLIVE_API_TOKEN_<environment>`.
 Optional PROD ALB secrets are `DVLIVE_ALB_TOKEN_DEV`, `DVLIVE_ALB_TOKEN_STAG`, `DVLIVE_ALB_TOKEN_PROD` (selected by `DVLIVE_ENV`).
-`DVLIVE_BEARER_TOKEN` in script config is used only by direct add-vote.
+`DVLIVE_API_TOKEN_DEV`, `DVLIVE_API_TOKEN_STAG` and `DVLIVE_API_TOKEN_PROD` in script config are used only by direct add-vote.
 
 Details, POST scripts, and available variables: [script/README.md](script/README.md).
 SDK tests use mocked HTTP responses and run separately from the live smoke tests:

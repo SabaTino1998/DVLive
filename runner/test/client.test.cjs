@@ -54,7 +54,7 @@ test('CLI selects the environment token and URL from environment overrides', t =
       const local = process.env.DVLIVE_MODE === 'INT';
       assert.equal(url.hostname, (local ? 'int-' : '') + hosts[process.env.DVLIVE_ENV]);
       assert.equal(options.headers['X-Internal-Auth'], local ? undefined : process.env['DVLIVE_ALB_TOKEN_' + process.env.DVLIVE_ENV]);
-      assert.equal(options.headers.Authorization, 'Bearer ' + process.env.DVLIVE_API_TOKEN);
+      assert.equal(options.headers.Authorization, 'Bearer ' + process.env['DVLIVE_API_TOKEN_' + process.env.DVLIVE_ENV].trim());
       return Response.json({name:'Show', startDate:'2026-01-01', endDate:'2026-12-31'});
     };
   `);
@@ -65,11 +65,11 @@ test('CLI selects the environment token and URL from environment overrides', t =
       showVote: { uuid: 'show' },
     }));
     const result = spawnSync(process.execPath, ['--require', mock, join(directory, 'run.js'), 'getShowVote'], {
-      env: { ...process.env, DVLIVE_MODE: mode, DVLIVE_ENV: environment, DVLIVE_API_TOKEN: 'cli-token', DVLIVE_ALB_TOKEN_DEV: 'dev-cli-token', DVLIVE_ALB_TOKEN_STAG: 'stag-cli-token', DVLIVE_ALB_TOKEN_PROD: 'prod-cli-token' },
+      env: { ...process.env, DVLIVE_MODE: mode, DVLIVE_ENV: environment, DVLIVE_API_TOKEN: 'legacy-token', DVLIVE_API_TOKEN_DEV: ' dev-api-token ', DVLIVE_API_TOKEN_STAG: ' stag-api-token ', DVLIVE_API_TOKEN_PROD: ' prod-api-token ', DVLIVE_ALB_TOKEN_DEV: 'dev-cli-token', DVLIVE_ALB_TOKEN_STAG: 'stag-cli-token', DVLIVE_ALB_TOKEN_PROD: 'prod-cli-token' },
       encoding: 'utf8',
     });
     assert.equal(result.status, 0, result.stderr);
-    assert.equal(result.stdout.includes(mode === 'INT' ? 'Authorization: Bearer cli-token' : `X-Internal-Auth: ${environment.toLowerCase()}-cli-token`), true);
+    assert.equal(result.stdout.includes(mode === 'INT' ? `Authorization: Bearer ${environment.toLowerCase()}-api-token` : `X-Internal-Auth: ${environment.toLowerCase()}-cli-token`), true);
     assert.equal(result.stdout.includes('[REDACTED]'), false);
   }
 });
@@ -113,5 +113,42 @@ test('extra request headers cannot override configured authentication or add ALB
     assert.equal(headers.get('Authorization'), 'Bearer api-token');
     assert.equal(headers.get('X-Internal-Auth'), mode === 'INT' ? null : 'alb-token');
     assert.equal(headers.get('X-Test'), 'kept');
+  }
+});
+
+test('CLI selects JSON tokens and rejects missing or blank selected tokens without fallback', t => {
+  const { mkdtempSync, writeFileSync, copyFileSync, rmSync } = require('node:fs');
+  const { tmpdir } = require('node:os');
+  const { join } = require('node:path');
+  const { spawnSync } = require('node:child_process');
+  const directory = mkdtempSync(join(tmpdir(), 'dvlive-runner-config-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  for (const file of ['run.js', 'dvliveClient.js']) copyFileSync(join(__dirname, '..', file), join(directory, file));
+  const mock = join(directory, 'fetch.cjs');
+  writeFileSync(mock, `global.fetch = async (url, options) => {
+    require('node:assert/strict').equal(options.headers.Authorization, 'Bearer json-token');
+    return Response.json({name: 'Show'});
+  };`);
+  const env = { ...process.env };
+  for (const key of Object.keys(env)) if (key.startsWith('DVLIVE_')) delete env[key];
+  for (const environment of ['DEV', 'STAG', 'PROD']) {
+    for (const mode of ['INT', 'PROD']) {
+      const tokenKey = `DVLIVE_API_TOKEN_${environment}`;
+      const config = {
+        DVLIVE_MODE: mode, DVLIVE_ENV: environment, showVote: { uuid: 'show' },
+        DVLIVE_API_TOKEN: 'legacy-token',
+        DVLIVE_API_TOKEN_DEV: 'other-token', DVLIVE_API_TOKEN_STAG: 'other-token', DVLIVE_API_TOKEN_PROD: 'other-token',
+      };
+      for (const token of [' json-token ', undefined, '', '   ']) {
+        writeFileSync(join(directory, 'config.json'), JSON.stringify({ ...config, [tokenKey]: token }));
+        const result = spawnSync(process.execPath, ['--require', mock, join(directory, 'run.js'), 'getShowVote'], { env, encoding: 'utf8' });
+        assert.equal(result.status, token?.trim() ? 0 : 1, result.stderr);
+        if (!token?.trim()) assert.ok(result.stderr.includes(`${tokenKey} is required`));
+      }
+      writeFileSync(join(directory, 'config.json'), JSON.stringify({ ...config, [tokenKey]: 'json-token' }));
+      const blankOverride = spawnSync(process.execPath, [join(directory, 'run.js'), 'getShowVote'], { env: { ...env, [tokenKey]: '   ' }, encoding: 'utf8' });
+      assert.equal(blankOverride.status, 1);
+      assert.ok(blankOverride.stderr.includes(`${tokenKey} is required`));
+    }
   }
 });
