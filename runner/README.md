@@ -48,6 +48,7 @@ npm run getShowVoteChoice  # participant + voter balance + current round (3 GETs
 npm run getShowVote        # GET  /show-vote/{uuid}
 npm run createVoter        # POST /show-vote/{uuid}/voter
 npm run getVoter           # GET  /show-vote/{uuid}/voter/{userRef}
+npm run addVote            # POST .../add-vote (credit points)
 npm run castVote           # POST .../vote
 
 npm start                  # uses config.action
@@ -77,6 +78,11 @@ Each run prints a curl command including the actual authentication value, the ca
 | `createVoter.uniqRef` | string | no | Request body. |
 | `getVoter.showVoteUuid` | string | yes for `getVoter` | Path UUID. |
 | `getVoter.userRef` | string | yes for `getVoter` | Voter uniqRef (path). |
+| `addVote.showVoteUuid` | string | yes for `addVote` | Path UUID. |
+| `addVote.userRef` | string | yes for `addVote` | Voter uniqRef (path). |
+| `addVote.additionalVoteType` | string | yes for `addVote` | `PURCHASE`, `SPONSOR`, `VIDEO`, `GAME`, `REFERAL` or `PROMO`. |
+| `addVote.uniqueTransactionId` | string | yes for `addVote` | Nonblank transaction identifier for the credit operation. |
+| `addVote.nbPoints` | integer | yes for `addVote` | Positive number of points to credit. |
 | `castVote.showVoteUuid` | string | yes for `castVote` | Path UUID. |
 | `castVote.userRef` | string | yes for `castVote` | Voter uniqRef (path). |
 | `castVote.votes` | array | yes for `castVote` | Body: `{ choiceUuid, nbVotes }[]`. |
@@ -96,6 +102,7 @@ For POST actions, path fields (`showVoteUuid`, `userRef`) are stripped from the 
 | `getShowVote` | `GET /show-vote/{uuid}` | `client.showVotes.get(uuid)` |
 | `createVoter` | `POST /show-vote/{uuid}/voter` | `client.voters.create(showVoteUuid, body)` |
 | `getVoter` | `GET /show-vote/{uuid}/voter/{userRef}` | `client.voters.get(showVoteUuid, userRef)` |
+| `addVote` | `POST .../add-vote` | `client.voters.addVote(showVoteUuid, userRef, body)` |
 | `castVote` | `POST .../vote` | `client.voters.castVote(showVoteUuid, uniqRef, body)` |
 
 `getShowVoteChoice` composes three upstream GET requests: it fetches the choice,
@@ -116,12 +123,27 @@ verified JWT. `openapi.json` describes the individual upstream endpoints.
 - `config.example.json` — template configuration.
 - `config.json` — real configuration; **gitignored** (may contain tokens).
 
-For vote crediting, use the standalone `../script/smoke-add-vote.sh` direct-curl smoke test.
-The upstream OpenAPI retains the endpoint for reference.
+For vote crediting, add an `addVote` section to `config.json` and run `npm run addVote`:
+
+```json
+"addVote": {
+  "uniqueTransactionId": "credit-ozzy-001-video-0001",
+  "showVoteUuid": "00000000-0000-4000-8000-000000000001",
+  "userRef": "ozzy-001",
+  "additionalVoteType": "VIDEO",
+  "nbPoints": 1
+}
+```
+
+Set `uniqueTransactionId` to an identifier for the credit transaction.
+Use a new identifier for each new credit operation.
+
+This credits points to the voter; `castVote` spends them on choices.
+The standalone `../script/smoke-add-vote.sh` direct-curl smoke test is also available.
 
 The external hosts are `dev-webshow-engine.dv-live.com` (DEV),
 `stag-webshow-engine.dv-live.com` (STAG) and `webshow-engine.dv-live.com` (PROD).
-External ALB access currently allows GET and HEAD. `createVoter` and `castVote`
+External ALB access currently allows GET and HEAD. `createVoter`, `addVote` and `castVote`
 use POST and require POST to be enabled by the service owner.
 
 Run mocked checks without calling the upstream service with `npm test`.

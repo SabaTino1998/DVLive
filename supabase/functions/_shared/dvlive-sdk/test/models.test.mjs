@@ -48,10 +48,10 @@ test("nested DTOs are independent of service response objects", () => {
 });
 
 test("constructors preserve absent and null fields and expose only serializable instance data", () => {
-  const show = new ShowVote("Show", "start", "end");
+  const show = new ShowVote("Show", "Europe/Paris", "start", "end");
   assert.equal(Object.hasOwn(show, "round"), false);
-  assert.deepEqual(JSON.parse(JSON.stringify(show)), { name: "Show", startDate: "start", endDate: "end" });
-  assert.equal(new ShowVote("Show", "start", "end", null).round, null);
+  assert.deepEqual(JSON.parse(JSON.stringify(show)), { name: "Show", timezone: "Europe/Paris", startDate: "start", endDate: "end" });
+  assert.equal(new ShowVote("Show", "Europe/Paris", "start", "end", null).round, null);
   const participant = new Choice("choice", "First", "Last", "PRESENT", null);
   assert.equal(participant.bio, null);
   assert.equal(Object.hasOwn(participant, "desktopPicture"), false);

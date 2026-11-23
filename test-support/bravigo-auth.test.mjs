@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { create, getNumericDate, verify } from '@jsr/zaubrik__djwt';
 import { edgeModule } from './load-edge.mjs';
+import { show } from '../supabase/functions/_shared/dvlive-sdk/test/responses.fixture.mjs';
 
 const USER = 'ee120e3a-03df-4c2a-b469-0b0e80034cd1';
 const REFERENCE = 'smartuser-absolute-reference';
@@ -146,10 +147,11 @@ test('show and choice require app JWTs and never accept a caller DV Live token',
 });
 
 test('DVLive sends the configured API bearer secret without forwarding caller tokens', async t => {
-  const send = t.mock.method(globalThis, 'fetch', async () => Response.json({ name: 'Show', startDate: '2026-01-01', endDate: '2026-12-31' }));
+  const send = t.mock.method(globalThis, 'fetch', async () => Response.json(show));
   const handle = createHandler({ env: name => ({ DVLIVE_API_TOKEN_STAG: 'private-token', DVLIVE_ENV: 'STAG', APP_JWT_SECRET: SECRET })[name] });
   const response = await handle(new Request('http://edge.test/dvlive?mode=getShowVote&uuid=show', { headers: { Authorization: `Bearer ${await sign(appClaims)}`, 'bearer-token': 'caller-token' } }));
   assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { ok: true, data: show });
   assert.equal(send.mock.calls[0].arguments[1].headers.get('Authorization'), 'Bearer private-token');
   assert.equal(send.mock.calls[0].arguments[1].headers.get('bearer-token'), null);
 });

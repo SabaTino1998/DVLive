@@ -60,10 +60,13 @@ the original HTTP status. Errors use `{ "ok": false, "error": { "message", "code
 | mode | Method | Query parameters besides `mode` | JSON body | Response |
 | --- | --- | --- | --- | --- |
 | `getShowVoteChoice` | GET | `uuid` | — | Participant, status, images, rounds |
-| `getShowVote` | GET | `uuid` | — | Show, dates, and current round with participants |
+| `getShowVote` | GET | `uuid` | — | Show name, timezone, dates, and current round with participants |
 | `getVoter` | GET | `showVoteUuid` | — | Voter, balance, fraud status |
 | `createVoter` | POST | `showVoteUuid` | Optional `email`, `phone` | Registration result |
 | `castVote` | POST | `showVoteUuid` | Required `votes`, optional fraud prevention fields | Voting result and remaining votes, when provided |
+
+`getShowVote` returns the show's IANA time zone identifier in `data.timezone`
+(for example, `Europe/Paris`).
 
 `votes` is a non-empty array of `{ "choiceUuid": "...", "nbVotes": 1 }`.
 The fraud prevention fields are `sessionToken`, `phoneFingerPrint`, `ip`, `userAgent`,
@@ -247,6 +250,7 @@ npm ci --prefix supabase/functions/_shared/dvlive-sdk
 npm --prefix supabase/functions/_shared/dvlive-sdk test
 ```
 
-Vote crediting is available only through `bash script/smoke-add-vote.sh`, which uses
-local DV Live environment/bearer configuration and calls the upstream API directly with curl.
-It is not exposed by the SDK, Edge Function, or reference runner.
+Vote crediting is available through `npm run addVote` in `runner/` (see
+[runner configuration](runner/README.md)), or `bash script/smoke-add-vote.sh`,
+which calls the upstream API directly with curl.
+It is not exposed by the SDK or Edge Function.

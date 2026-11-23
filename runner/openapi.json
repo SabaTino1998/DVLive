@@ -758,7 +758,14 @@
                 "type": "object"
             },
             "AddVoteRequest": {
+                "required": ["uniqueTransactionId"],
                 "properties": {
+                    "uniqueTransactionId": {
+                        "description": "Unique identifier of the credit transaction. Required by the upstream API.",
+                        "type": "string",
+                        "minLength": 1,
+                        "example": "credit-ozzy-001-video-0001"
+                    },
                     "additionalVoteType": {
                         "description": "Type of additional vote acquisition.",
                         "type": "string",
@@ -1013,12 +1020,18 @@
             "ShowVoteResponse": {
                 "required": [
                     "name",
+                    "timezone",
                     "startDate",
                     "endDate"
                 ],
                 "properties": {
                     "name": {
                         "type": "string"
+                    },
+                    "timezone": {
+                        "type": "string",
+                        "description": "IANA time zone identifier configured for the show",
+                        "example": "Europe/Paris"
                     },
                     "startDate": {
                         "type": "string"

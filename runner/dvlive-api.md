@@ -46,6 +46,7 @@ npm run getShowVote
 | `getShowVote` | `GET /show-vote/{uuid}` | `client.showVotes.get(uuid)` |
 | `createVoter` | `POST /show-vote/{uuid}/voter` | `client.voters.create(showVoteUuid, body)` |
 | `getVoter` | `GET /show-vote/{uuid}/voter/{userRef}` | `client.voters.get(showVoteUuid, userRef)` |
+| `addVote` | `POST /show-vote/{uuid}/voter/{userRef}/add-vote` | `client.voters.addVote(showVoteUuid, userRef, body)` |
 | `castVote` | `POST /show-vote/{uuid}/voter/{uniqRef}/vote` | `client.voters.castVote(...)` |
 
 Path parameter `userRef` / `uniqRef` is the voter’s `uniqRef` from `CreateVoterRequest`.
@@ -77,5 +78,6 @@ Success responses for vote operations may include `nbVoteRemaining`.
 
 See `components/schemas` in `openapi.json` for full request/response models.
 
-For vote crediting, use the standalone `../script/smoke-add-vote.sh` direct-curl smoke test.
-The upstream OpenAPI retains the endpoint for reference.
+For vote crediting, configure `addVote` (`showVoteUuid`, `userRef`,
+`additionalVoteType`, positive integer `nbPoints`, nonblank `uniqueTransactionId`) and run `npm run addVote`.
+The standalone `../script/smoke-add-vote.sh` direct-curl smoke test is also available.

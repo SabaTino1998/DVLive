@@ -143,6 +143,11 @@ and `CastVoteResult`. Previous public `*Response` names have been
 removed rather than retained as aliases. The mode catalog now reports DTO names.
 Field names in the returned JSON are unchanged; additional upstream fields are omitted.
 
+`getShowVote` exposes `ShowVote.timezone` as a required string containing the
+show's IANA time zone identifier, for example `Europe/Paris`. The SDK passes
+through the upstream value and preserves the offsets in the date strings.
+The public constructor accepts `new ShowVote(name, timezone, startDate, endDate, round?)`.
+
 `ShowVote.round.choices` exposes `isNominated?: boolean` on each `Choice`.
 `getShowVoteChoice` also exposes `isNominated?: boolean` on `ShowVoteChoice`;
 true and false are preserved, omission remains supported, and other types are rejected.

@@ -16,7 +16,13 @@ export function makeRequest(method, fields) {
   }
 }
 
-export const show = { name: "Show", startDate: "2026-01-01", endDate: "2026-12-31", round: null };
+export const show = {
+  name: "Show",
+  timezone: "Europe/Paris",
+  startDate: "2026-09-01T18:00:00+02:00",
+  endDate: "2099-12-31T23:59:59+01:00",
+  round: null,
+};
 export const choice = { uuid: "choice", showVoteUuid: "show", firstname: "First", lastname: "Last", status: "ACTIVE", order: 1, bio: null };
 export const voter = { uniqRef: "a/b", remainingPoints: 3, userFraudStatus: "CLEAN", balance: { standardPoint: 3 } };
 export const operation = { status: "success", code: 201, message: "Recorded" };

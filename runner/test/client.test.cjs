@@ -236,3 +236,71 @@ test('candidate CLI uses configured voter reference and prints enriched fields',
     }
   }
 });
+
+for (const mode of ['INT', 'PROD']) {
+  test(`addVote credits points with encoded paths and ${mode} authentication`, async t => {
+    t.mock.method(console, 'log', () => {});
+    const response = { status: 'success', code: 201, message: 'Credited', nbVoteRemaining: 4 };
+    const capture = t.mock.method(globalThis, 'fetch', async () => Response.json(response, { status: 201 }));
+    const client = new DvliveClient({ environment: 'STAG', mode, apiToken: 'token', albToken: 'alb' });
+    const body = { additionalVoteType: 'VIDEO', nbPoints: 3, uniqueTransactionId: 'credit-001' };
+    assert.deepEqual(await client.voters.addVote('show/id', 'user/ref', body), response);
+    const [url, options] = capture.mock.calls[0].arguments;
+    assert.equal(url.href, `https://${mode === 'INT' ? 'int-' : ''}stag-webshow-engine.dv-live.com/show-vote/show%2Fid/voter/user%2Fref/add-vote`);
+    assert.equal(options.method, 'POST');
+    assert.equal(options.headers.Authorization, 'Bearer token');
+    assert.equal(options.headers['X-Internal-Auth'], mode === 'INT' ? undefined : 'alb');
+    assert.deepEqual(JSON.parse(options.body), body);
+    assert.throws(() => client.voters.addVote('', 'user', body), /showVoteUuid is required/);
+    assert.throws(() => client.voters.addVote('show', '', body), /userRef is required/);
+    assert.equal(capture.mock.callCount(), 1);
+  });
+}
+
+test('addVote CLI dispatches from arguments or config, validates input and reports upstream failures', t => {
+  const { mkdtempSync, writeFileSync, copyFileSync, rmSync } = require('node:fs');
+  const { tmpdir } = require('node:os');
+  const { join } = require('node:path');
+  const { spawnSync } = require('node:child_process');
+  const directory = mkdtempSync(join(tmpdir(), 'dvlive-add-vote-cli-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  for (const file of ['run.js', 'dvliveClient.js']) copyFileSync(join(__dirname, '..', file), join(directory, file));
+  const mock = join(directory, 'fetch.cjs');
+  writeFileSync(mock, `
+    const assert = require('node:assert/strict');
+    let calls = 0;
+    global.fetch = async (url, options) => {
+      calls++;
+      assert.equal(url.pathname, '/show-vote/show%2Fid/voter/user%2Fref/add-vote');
+      assert.equal(options.method, 'POST');
+      assert.deepEqual(JSON.parse(options.body), {additionalVoteType:'VIDEO',nbPoints:3,uniqueTransactionId:'credit-001'});
+      return process.env.FAIL_REQUEST === '1'
+        ? Response.json({message:'Credit rejected',code:422}, {status:422})
+        : Response.json({status:'success',code:201,message:'Credited',nbVoteRemaining:4}, {status:201});
+    };
+    process.on('exit', () => assert.equal(calls, Number(process.env.EXPECTED_CALLS)));
+  `);
+  const env = { ...process.env, DVLIVE_MODE: 'PROD', DVLIVE_ENV: 'STAG', DVLIVE_API_TOKEN_STAG: 'test-token' };
+  const valid = { showVoteUuid: 'show/id', userRef: 'user/ref', additionalVoteType: 'VIDEO', nbPoints: 3, uniqueTransactionId: 'credit-001' };
+  const cases = [
+    { section: valid, args: ['addVote'], calls: 1 },
+    { section: valid, args: [], calls: 1 },
+    { section: valid, args: ['addVote'], calls: 1, fail: true, error: /Credit rejected/ },
+    ...Object.keys(valid).map(key => ({ section: { ...valid, [key]: undefined }, error: new RegExp(`Missing required field "addVote.${key}"`) })),
+    ...['', '   ', 123].map(uniqueTransactionId => ({ section: { ...valid, uniqueTransactionId }, error: /uniqueTransactionId/ })),
+    ...[0, -1, 1.5, '3'].map(nbPoints => ({ section: { ...valid, nbPoints }, error: /nbPoints must be a positive integer/ })),
+    { section: { ...valid, additionalVoteType: 'INVALID' }, error: /additionalVoteType must be/ },
+  ];
+  for (const { section, args = ['addVote'], calls = 0, fail = false, error } of cases) {
+    writeFileSync(join(directory, 'config.json'), JSON.stringify({ action: 'addVote', addVote: section }));
+    const result = spawnSync(process.execPath, ['--require', mock, join(directory, 'run.js'), ...args], {
+      env: { ...env, EXPECTED_CALLS: String(calls), FAIL_REQUEST: fail ? '1' : '0' }, encoding: 'utf8',
+    });
+    assert.equal(result.status, error ? 1 : 0, result.stderr);
+    if (error) assert.match(result.stderr, error);
+    else assert.match(result.stdout, /Votes remaining: 4/);
+  }
+  const help = spawnSync(process.execPath, [join(directory, 'run.js'), 'help', 'addVote'], { encoding: 'utf8' });
+  assert.equal(help.status, 0, help.stderr);
+  for (const key of Object.keys(valid)) assert.ok(help.stdout.includes(`addVote.${key}`));
+});

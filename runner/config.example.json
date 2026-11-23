@@ -25,6 +25,13 @@
     "showVoteUuid": "00000000-0000-4000-8000-000000000001",
     "userRef": "ozzy-001"
   },
+  "addVote": {
+    "uniqueTransactionId": "credit-ozzy-001-video-0001",
+    "showVoteUuid": "00000000-0000-4000-8000-000000000001",
+    "userRef": "ozzy-001",
+    "additionalVoteType": "VIDEO",
+    "nbPoints": 1
+  },
   "castVote": {
     "showVoteUuid": "00000000-0000-4000-8000-000000000001",
     "userRef": "ozzy-001",

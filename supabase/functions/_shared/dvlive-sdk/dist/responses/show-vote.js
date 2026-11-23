@@ -22,16 +22,18 @@ export class RoundResponse {
 }
 export class ShowVoteResponse {
     name;
+    timezone;
     startDate;
     endDate;
-    constructor(name, startDate, endDate) {
+    constructor(name, timezone, startDate, endDate) {
         this.name = name;
+        this.timezone = timezone;
         this.startDate = startDate;
         this.endDate = endDate;
     }
     static decode(value, path = "ShowVoteResponse") {
         const source = object(value, path);
-        const response = new ShowVoteResponse(string(source.name, `${path}.name`), string(source.startDate, `${path}.startDate`), string(source.endDate, `${path}.endDate`));
+        const response = new ShowVoteResponse(string(source.name, `${path}.name`), string(source.timezone, `${path}.timezone`), string(source.startDate, `${path}.startDate`), string(source.endDate, `${path}.endDate`));
         if (source.round !== undefined)
             response.round = nullable(source.round, RoundResponse.decode, `${path}.round`);
         return response;

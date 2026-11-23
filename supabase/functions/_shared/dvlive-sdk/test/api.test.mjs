@@ -189,8 +189,9 @@ test("nested mappings preserve nulls and absent optional fields and omit upstrea
   }));
   assert.deepEqual(JSON.parse(JSON.stringify((await new ApiService(config).getShowVote("show")).data)), { ...show, round });
 
+  const { round: _round, ...showWithoutRound } = show;
   for (const optional of [{}, { round: null }]) {
-    const payload = { name: "Show", startDate: "2026-01-01", endDate: "2026-12-31", ...optional };
+    const payload = { ...showWithoutRound, ...optional };
     t.mock.method(globalThis, "fetch", async () => Response.json(payload));
     assert.deepEqual(JSON.parse(JSON.stringify((await new ApiService(config).getShowVote("show")).data)), payload);
   }

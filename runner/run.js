@@ -56,6 +56,14 @@ const ACTION_REGISTRY = {
     optional: [],
     summary: 'Get voter balance and fraud status',
   },
+  addVote: {
+    group: 'voter',
+    http: 'POST /show-vote/{uuid}/voter/{userRef}/add-vote',
+    client: 'client.voters.addVote(showVoteUuid, userRef, body)',
+    config: ['addVote.showVoteUuid', 'addVote.userRef', 'addVote.additionalVoteType', 'addVote.nbPoints', 'addVote.uniqueTransactionId'],
+    optional: [],
+    summary: 'Credit additional points to a voter (PURCHASE, SPONSOR, VIDEO, GAME, REFERAL, PROMO)',
+  },
   castVote: {
     group: 'voter',
     http: 'POST /show-vote/{uuid}/voter/{uniqRef}/vote',
@@ -322,6 +330,26 @@ async function runGetVoter(client, cfg) {
   return res;
 }
 
+async function runAddVote(client, cfg) {
+  require_(cfg.addVote, ['showVoteUuid', 'userRef', 'additionalVoteType', 'nbPoints', 'uniqueTransactionId'], 'addVote');
+  const { showVoteUuid, userRef, additionalVoteType, nbPoints, uniqueTransactionId } = cfg.addVote;
+  if (typeof uniqueTransactionId !== 'string' || !uniqueTransactionId.trim()) {
+    throw new Error('config.addVote.uniqueTransactionId must be a nonblank string');
+  }
+  if (!['PURCHASE', 'SPONSOR', 'VIDEO', 'GAME', 'REFERAL', 'PROMO'].includes(additionalVoteType)) {
+    throw new Error('config.addVote.additionalVoteType must be PURCHASE, SPONSOR, VIDEO, GAME, REFERAL or PROMO');
+  }
+  if (!Number.isInteger(nbPoints) || nbPoints <= 0) {
+    throw new Error('config.addVote.nbPoints must be a positive integer');
+  }
+  const body = voterRequestBody(cfg.addVote);
+  printHeader('voters.addVote', { showVoteUuid, userRef, body });
+  const res = await client.voters.addVote(showVoteUuid, userRef, body);
+  console.log(JSON.stringify(res, null, 2));
+  printNbVoteRemaining(res);
+  return res;
+}
+
 async function runCastVote(client, cfg) {
   require_(cfg.castVote, ['showVoteUuid', 'userRef', 'votes'], 'castVote');
   const { showVoteUuid, userRef } = cfg.castVote;
@@ -426,6 +454,9 @@ async function main() {
       break;
     case 'getVoter':
       await runGetVoter(client, cfg);
+      break;
+    case 'addVote':
+      await runAddVote(client, cfg);
       break;
     case 'castVote':
       await runCastVote(client, cfg);

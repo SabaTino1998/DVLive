@@ -100,7 +100,7 @@ node --test test-support/smartuser.test.mjs
 
 | Script | Mode | Controllo |
 | --- | --- | --- |
-| `smoke-get-show-vote.sh` | `getShowVote` | Nome, date e round opzionale dello show |
+| `smoke-get-show-vote.sh` | `getShowVote` | Nome, fuso orario IANA in `data.timezone` (es. `Europe/Paris`), date e round opzionale dello show |
 | `smoke-get-show-vote-choice.sh` | `getShowVoteChoice` | UUID, show, nome, stato, ordine, saldo, punti rimanenti e date del round (oppure `round: null`) |
 | `smoke-get-voter.sh` | `getVoter` | Riferimento, punti, stato antifrode e saldo |
 | `smoke-create-voter.sh` | `createVoter` | HTTP 201 ed esito registrazione |
@@ -172,7 +172,8 @@ Invia con curl `POST /show-vote/{showVoteUuid}/voter/{userRef}/add-vote`, con bo
 `Authorization: Bearer <token DV Live>`. Non usa chiavi né header Supabase.
 `DEV` usa `https://dev-webshow-engine.dv-live.com`; `STAG` usa `https://stag-webshow-engine.dv-live.com`; `PROD` usa
 `https://webshow-engine.dv-live.com`. `USER_REF` è una absolute reference, mai un token N.
-Questa operazione non è più esposta nel catalogo SDK/Edge Function né nel runner.
+Questa operazione è disponibile anche nel runner con `npm run addVote`
+(vedi [configurazione](../runner/README.md)); non è esposta nel catalogo SDK/Edge Function.
 `castVote` invia un voto per `CHOICE_UUID`; `VOTES` permette di passare un array JSON:
 
 ```sh

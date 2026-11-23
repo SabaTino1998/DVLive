@@ -50,6 +50,8 @@ a=sys.argv[1:]
 open(os.environ['CAPTURE'],'w').write(json.dumps(a))
 post='POST' in a
 data={'status':'success','code':201,'message':'Recorded'} if post else {'ok':True,'data':{'name':'Show','startDate':'start','endDate':'end','round':None}}
+if not post and os.environ.get('MOCK_WITHOUT_TIMEZONE') != '1':
+    data['data']['timezone']='Europe/Paris'
 open(a[a.index('--output')+1],'w').write(json.dumps(data))
 print('201' if post else '200',end='')
 `, { mode: 0o755 });
@@ -66,8 +68,14 @@ print('201' if post else '200',end='')
       assert.ok(args.includes('Authorization: Bearer test-app-jwt'));
       assert.ok(args.includes('apikey: test-key'));
       assert.equal(new URL(args.at(-1)).searchParams.get('uuid'), f.settings.SHOW_VOTE_UUID);
+      assert.match(result.stdout, /"timezone": "Europe\/Paris"/);
     }
   }
+  const missingTimezone = spawnSync('bash', ['smoke-get-show-vote.sh'], {
+    cwd: join(root, 'script'), env: { ...f.environment, MOCK_WITHOUT_TIMEZONE: '1' }, encoding: 'utf8',
+  });
+  assert.equal(missingTimezone.status, 1);
+  assert.match(missingTimezone.stderr, /expected a nonempty show timezone/);
 });
 test('loader rejects invalid JSON and ignores unknown shell variable names', t => {
   const f = fixture(t);

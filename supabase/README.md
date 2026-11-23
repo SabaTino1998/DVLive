@@ -21,7 +21,7 @@ Identifiers must also be passed in the query string.
 
 | `mode` | Method | Query parameters besides `mode` | JSON body | Result |
 | --- | --- | --- | --- | --- |
-| `getShowVote` | GET | `uuid` | — | Show name and dates, current round, and participants |
+| `getShowVote` | GET | `uuid` | — | Show name, timezone, dates, and current round with participants |
 | `getShowVoteChoice` | GET | `uuid` | — | Participant details, status, images, and rounds |
 | `getVoter` | GET | `showVoteUuid` | — | Voter details, balance, and fraud status |
 | `createVoter` | POST | `showVoteUuid` | Optional fields: `email`, `phone` | Registration result |
@@ -182,6 +182,28 @@ configuration in [config.toml](config.toml) and the actual SDK mapping in `deno.
 Successful responses wrap the public model returned by the SDK in
 `{ "ok": true, "data": ... }` and preserve the DV Live HTTP status.
 Errors use `{ "ok": false, "error": { "message", "code", "details" } }`.
+
+The `getShowVote` response includes the show's IANA time zone identifier in
+`data.timezone`. Date strings retain their upstream offsets.
+
+```json
+{
+  "ok": true,
+  "data": {
+    "name": "Renamed testing Show",
+    "timezone": "Europe/Paris",
+    "startDate": "2026-09-01T18:00:00+02:00",
+    "endDate": "2099-12-31T23:59:59+01:00",
+    "round": {
+      "currentRound": 2,
+      "startDay": "2026-10-01T02:00:00+02:00",
+      "endDay": "2026-11-30T00:59:00+01:00",
+      "name": "Week 2",
+      "choices": []
+    }
+  }
+}
+```
 
 | Status | Meaning |
 | --- | --- |

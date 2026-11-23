@@ -26,7 +26,7 @@ export const API_MODES: Readonly<Record<ApiModes, ApiModeDefinition>> = {
   },
   [ApiModes.GetShowVote]: {
     method: "GET", params: ["uuid"], body: [],
-    description: "Returns the show name and dates, current round, and its participants.",
+    description: "Returns the show name, timezone, dates, and current round with its participants.",
     response: "ShowVote",
   },
   [ApiModes.CreateVoter]: {

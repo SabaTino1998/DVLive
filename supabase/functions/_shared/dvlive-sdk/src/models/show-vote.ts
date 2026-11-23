@@ -27,6 +27,7 @@ export class ShowVote {
 
   constructor(
     readonly name: string,
+    readonly timezone: string,
     readonly startDate: string,
     readonly endDate: string,
     round?: Round | null,
@@ -37,6 +38,7 @@ export class ShowVote {
   static fromResponse(response: ShowVoteResponse): ShowVote {
     return new ShowVote(
       response.name,
+      response.timezone,
       response.startDate,
       response.endDate,
       response.round == null ? response.round : Round.fromResponse(response.round),

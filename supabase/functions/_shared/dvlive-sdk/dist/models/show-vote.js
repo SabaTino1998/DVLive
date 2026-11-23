@@ -19,17 +19,19 @@ export class Round {
 }
 export class ShowVote {
     name;
+    timezone;
     startDate;
     endDate;
-    constructor(name, startDate, endDate, round) {
+    constructor(name, timezone, startDate, endDate, round) {
         this.name = name;
+        this.timezone = timezone;
         this.startDate = startDate;
         this.endDate = endDate;
         if (round !== undefined)
             this.round = round;
     }
     static fromResponse(response) {
-        return new ShowVote(response.name, response.startDate, response.endDate, response.round == null ? response.round : Round.fromResponse(response.round));
+        return new ShowVote(response.name, response.timezone, response.startDate, response.endDate, response.round == null ? response.round : Round.fromResponse(response.round));
     }
 }
 //# sourceMappingURL=show-vote.js.map

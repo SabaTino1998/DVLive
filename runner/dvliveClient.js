@@ -138,6 +138,16 @@ class DvliveClient {
         );
       },
 
+      addVote: (showVoteUuid, userRef, body) => {
+        if (!showVoteUuid) throw new Error('voters.addVote: showVoteUuid is required');
+        if (!userRef) throw new Error('voters.addVote: userRef is required');
+        return this.request(
+          'POST',
+          `/show-vote/${encodeURIComponent(showVoteUuid)}/voter/${encodeURIComponent(userRef)}/add-vote`,
+          { body: body ?? {} },
+        );
+      },
+
       castVote: (showVoteUuid, uniqRef, body) => {
         if (!showVoteUuid) throw new Error('voters.castVote: showVoteUuid is required');
         if (!uniqRef) throw new Error('voters.castVote: uniqRef is required');
