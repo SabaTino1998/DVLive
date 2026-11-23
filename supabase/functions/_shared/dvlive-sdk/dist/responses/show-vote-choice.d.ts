@@ -17,6 +17,7 @@ export declare class ChoiceResponse {
     readonly firstname: string;
     readonly lastname: string;
     readonly status: ChoiceStatusResponse;
+    isNominated?: boolean;
     bio?: string | null;
     desktopPicture?: string | null;
     mobilePicture?: string | null;
@@ -30,6 +31,7 @@ export declare class ShowVoteChoiceResponse {
     readonly lastname: string;
     readonly status: string;
     readonly order: number;
+    isNominated?: boolean;
     bio?: string | null;
     desktopPicture?: string | null;
     mobilePicture?: string | null;

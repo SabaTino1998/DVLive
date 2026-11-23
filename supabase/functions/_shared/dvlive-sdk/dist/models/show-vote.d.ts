@@ -12,10 +12,11 @@ export declare class Round {
 }
 export declare class ShowVote {
     readonly name: string;
+    readonly timezone: string;
     readonly startDate: string;
     readonly endDate: string;
     readonly round?: Round | null;
-    constructor(name: string, startDate: string, endDate: string, round?: Round | null);
+    constructor(name: string, timezone: string, startDate: string, endDate: string, round?: Round | null);
     static fromResponse(response: ShowVoteResponse): ShowVote;
 }
 //# sourceMappingURL=show-vote.d.ts.map

@@ -29,6 +29,7 @@ export class ShowVoteResponse {
 
   constructor(
     readonly name: string,
+    readonly timezone: string,
     readonly startDate: string,
     readonly endDate: string,
   ) {}
@@ -37,6 +38,7 @@ export class ShowVoteResponse {
     const source = object(value, path);
     const response = new ShowVoteResponse(
       string(source.name, `${path}.name`),
+      string(source.timezone, `${path}.timezone`),
       string(source.startDate, `${path}.startDate`),
       string(source.endDate, `${path}.endDate`),
     );

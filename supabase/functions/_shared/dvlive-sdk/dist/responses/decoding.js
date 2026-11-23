@@ -10,6 +10,11 @@ export function string(value, path) {
         throw new TypeError(`${path} must be a string.`);
     return value;
 }
+export function boolean(value, path) {
+    if (typeof value !== "boolean")
+        throw new TypeError(`${path} must be a boolean.`);
+    return value;
+}
 export function integer(value, path) {
     if (typeof value !== "number" || !Number.isInteger(value)) {
         throw new TypeError(`${path} must be an integer.`);

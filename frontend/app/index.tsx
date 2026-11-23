@@ -81,12 +81,11 @@ function HomeContent() {
       <TextInput accessibilityLabel="Search choices" placeholder="Search choices" placeholderTextColor={colors.muted} value={search} onChangeText={setSearch} style={[h.search, { width: wide ? 240 : '100%' }]} />
     </View>
     {showError ? <Notice retry={retry}>{showError}</Notice> : busy && !show ? <Loading label="Loading choices…" /> : filtered.length ? <View style={h.grid}>
-      {filtered.map(choice => <Pressable accessibilityRole="link" accessibilityLabel={`${choice.firstname} ${choice.lastname}, ${statusLabel(choice.status)}${choice.isNominated === true ? ', nominated' : ''}`} key={choice.uuid} onPress={() => router.push({ pathname: '/choices/[uuid]', params: { uuid: choice.uuid } })} style={({ pressed }) => [h.card, { width: cardWidth, opacity: pressed ? .7 : 1 }]}>
+      {filtered.map(choice => <Pressable accessibilityRole="link" accessibilityLabel={`${choice.firstname} ${choice.lastname}, ${statusLabel(choice.status, choice.isNominated)}`} key={choice.uuid} onPress={() => router.push({ pathname: '/choices/[uuid]', params: { uuid: choice.uuid } })} style={({ pressed }) => [h.card, { width: cardWidth, opacity: pressed ? .7 : 1 }]}>
         <Portrait choice={choice} />
         <View style={h.caption}>
           <View style={h.chips}>
-            <Status value={choice.status} />
-            {choice.isNominated === true && <Text style={h.nominated}>NOMINATED</Text>}
+            <Status value={choice.status} isNominated={choice.isNominated} />
           </View>
           <Text style={h.name}>{choice.firstname} {choice.lastname}</Text>
           <Text style={h.detailsLink}>View choice →</Text>
@@ -114,7 +113,6 @@ const h = StyleSheet.create({
   search: { minHeight: 40, paddingHorizontal: 12, borderWidth: 1, borderColor: colors.line, borderRadius: 6, backgroundColor: '#fff', fontSize: 13, color: colors.ink },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-start', gap: '2%', rowGap: 20 }, card: { backgroundColor: '#fff', borderWidth: 1, borderColor: colors.line, borderRadius: 8, overflow: 'hidden' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
-  nominated: { color: colors.blue, backgroundColor: '#e9efff', borderRadius: 4, paddingHorizontal: 7, paddingVertical: 2, fontSize: 10, lineHeight: 18, letterSpacing: .4, fontWeight: '700' },
   caption: { padding: 16, gap: 8 }, name: { color: colors.ink, fontSize: 18, lineHeight: 25, fontWeight: '600' }, detailsLink: { color: colors.blue, fontSize: 12, marginTop: 6 },
   empty: { padding: 40, alignItems: 'center', gap: 15, backgroundColor: '#fff', borderWidth: 1, borderColor: colors.line, borderRadius: 8 }, emptyTitle: { color: colors.ink, fontSize: 19, fontWeight: '600', textAlign: 'center' },
 });

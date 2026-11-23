@@ -25,7 +25,7 @@ The kit version above is independent of the vendored `@digitalvirgo/dvlive-api` 
 | Path | Role |
 | ---- | ---- |
 | [`runner/`](runner/) | Self-contained Node.js CLI that calls DV Live APIs from the command line. Config-driven actions in `run.js` and `dvliveClient.js`. Setup and actions: [`runner/README.md`](runner/README.md). API notes: [`runner/dvlive-api.md`](runner/dvlive-api.md). |
-| [`supabase/functions/dvlive/`](supabase/functions/dvlive/) | Edge function (`index.ts`, `deno.json`). Secrets/env: `DVLIVE_ENV`, `DVLIVE_API_TOKEN`, optional `DVLIVE_LOG_*`. Modes: `getShowVote`, `getShowVoteChoice`, `getVoter`, `createVoter`, `castVote`. |
+| [`supabase/functions/dvlive/`](supabase/functions/dvlive/) | Edge function (`index.ts`, `deno.json`). Secrets/env: `DVLIVE_ENV`, `DVLIVE_ALB_TOKEN_DEV`, `DVLIVE_ALB_TOKEN_STAG`, `DVLIVE_ALB_TOKEN_PROD` (selected by `DVLIVE_ENV`), optional `DVLIVE_LOG_*`. Modes: `getShowVote`, `getShowVoteChoice`, `getVoter`, `createVoter`, `castVote`. |
 | [`supabase/functions/_shared/dvlive-sdk/`](supabase/functions/_shared/dvlive-sdk/) | Vendored TypeScript SDK `@digitalvirgo/dvlive-api` (request validation, models, transport). Package docs: [`README.md`](supabase/functions/_shared/dvlive-sdk/README.md). |
 | [`supabase/functions/bolt-auth-proxy/`](supabase/functions/bolt-auth-proxy/) | Bravigo-aligned SmartUser sync and app JWT issuance (unchanged proxy). |
 | [`frontend/`](frontend/) | Expo SDK 54 reference app (web, iOS, Android) with SmartUser login and the five voting modes. |
@@ -35,7 +35,7 @@ The kit version above is independent of the vendored `@digitalvirgo/dvlive-api` 
 
 ## Current status
 
-This **0.1.0** tag covers the show (`getShowVote`), participant (`getShowVoteChoice`), voter (`getVoter` / `createVoter`), and cast-vote (`castVote`) APIs through the runner, edge function, SDK, Expo app, and smoke scripts. App JWT authentication and server-side `DVLIVE_API_TOKEN` are part of the edge contract.
+This **0.1.0** tag covers the show (`getShowVote`), participant (`getShowVoteChoice`), voter (`getVoter` / `createVoter`), and cast-vote (`castVote`) APIs through the runner, edge function, SDK, Expo app, and smoke scripts. App JWT authentication and server-side `DVLIVE_ALB_TOKEN_DEV`, `DVLIVE_ALB_TOKEN_STAG`, `DVLIVE_ALB_TOKEN_PROD` (selected by `DVLIVE_ENV`) are part of the edge contract.
 
 Bonus votes, purchased votes, DVPass oneshot flows, and voting statistics are part of the DVLive platform described above. They are not claimed as implemented surfaces in this kit tag.
 

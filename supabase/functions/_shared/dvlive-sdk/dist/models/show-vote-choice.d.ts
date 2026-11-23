@@ -18,10 +18,11 @@ export declare class Choice {
     readonly firstname: string;
     readonly lastname: string;
     readonly status: ChoiceStatus;
+    readonly isNominated?: boolean;
     readonly bio?: string | null;
     readonly desktopPicture?: string | null;
     readonly mobilePicture?: string | null;
-    constructor(uuid: string, firstname: string, lastname: string, status: ChoiceStatus, bio?: string | null, desktopPicture?: string | null, mobilePicture?: string | null);
+    constructor(uuid: string, firstname: string, lastname: string, status: ChoiceStatus, bio?: string | null, desktopPicture?: string | null, mobilePicture?: string | null, isNominated?: boolean);
     static fromResponse(response: ChoiceResponse): Choice;
 }
 export declare class ShowVoteChoice {
@@ -31,12 +32,13 @@ export declare class ShowVoteChoice {
     readonly lastname: string;
     readonly status: string;
     readonly order: number;
+    readonly isNominated?: boolean;
     readonly bio?: string | null;
     readonly desktopPicture?: string | null;
     readonly mobilePicture?: string | null;
     readonly eliminatedRound?: EliminatedRound | null;
     readonly reintroducedRound?: ReintroducedRound | null;
-    constructor(uuid: string, showVoteUuid: string, firstname: string, lastname: string, status: string, order: number, bio?: string | null, desktopPicture?: string | null, mobilePicture?: string | null, eliminatedRound?: EliminatedRound | null, reintroducedRound?: ReintroducedRound | null);
+    constructor(uuid: string, showVoteUuid: string, firstname: string, lastname: string, status: string, order: number, bio?: string | null, desktopPicture?: string | null, mobilePicture?: string | null, eliminatedRound?: EliminatedRound | null, reintroducedRound?: ReintroducedRound | null, isNominated?: boolean);
     static fromResponse(response: ShowVoteChoiceResponse): ShowVoteChoice;
 }
 //# sourceMappingURL=show-vote-choice.d.ts.map

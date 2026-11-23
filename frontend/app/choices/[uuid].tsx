@@ -20,7 +20,7 @@ function Detail() {
       <View style={d.copy}>
         <Eyebrow>CHOICE</Eyebrow>
         <Text accessibilityRole="header" style={s.heading}>{choice.firstname} {choice.lastname}</Text>
-        <View style={d.statusRow}><Text style={s.muted}>Status</Text><Status value={choice.status} /></View>
+        <View style={d.statusRow}><Text style={s.muted}>Status</Text><Status value={choice.status} isNominated={choice.isNominated} /></View>
         <View style={d.description}>
           <Text style={d.label}>Description</Text>
           <Text style={d.bio}>{choice.bio || 'No description available for this choice.'}</Text>

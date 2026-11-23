@@ -13,6 +13,11 @@ async function consumeNomination(api: ApiService) {
 }
 void consumeNomination;
 
+async function consumeTimezone(api: ApiService): Promise<string> {
+  return (await api.getShowVote("show")).data.timezone;
+}
+void consumeTimezone;
+
 const environment: string | undefined = "PROD";
 new ApiService({ environment });
 const parsed = parseMode("getShowVote");
@@ -25,13 +30,13 @@ import type { ShowVoteResponse } from "@digitalvirgo/dvlive-api";
 // @ts-expect-error The old GetVoterResponse alias has been replaced by Voter.
 import type { GetVoterResponse } from "@digitalvirgo/dvlive-api";
 
-const model: ShowVote = new ShowVote("Show", "2026-01-01", "2026-12-31");
-const mapped: ShowVote = ShowVote.fromResponse({ name: "Show", startDate: "2026-01-01", endDate: "2026-12-31" });
+const model: ShowVote = new ShowVote("Show", "Europe/Paris", "2026-01-01", "2026-12-31");
+const mapped: ShowVote = ShowVote.fromResponse({ name: "Show", timezone: "Europe/Paris", startDate: "2026-01-01", endDate: "2026-12-31" });
 const wrapped: ApiResponse<ShowVote> = new ApiResponse(mapped, 200, new Headers());
 void model;
 void wrapped;
 // @ts-expect-error Constructor fields retain their declared types.
-new ShowVote(123, "start", "end");
+new ShowVote(123, "Europe/Paris", "start", "end");
 // @ts-expect-error Factory input requires the original response fields.
 ShowVote.fromResponse({ title: "Show" });
 

@@ -27,10 +27,10 @@ const ACTION_REGISTRY = {
   getShowVoteChoice: {
     group: 'showVote',
     http: 'GET /show-vote-choice/{uuid}',
-    client: 'client.showVoteChoices.get(uuid)',
-    config: ['showVoteChoice.uuid'],
+    client: 'client.showVoteChoices.get(uuid, userRef)',
+    config: ['showVoteChoice.uuid', 'showVoteChoice.userRef'],
     optional: [],
-    summary: 'Get a show vote choice (participant) by UUID',
+    summary: 'Get participant details, voter balance and current round dates (three upstream GETs)',
   },
   getShowVote: {
     group: 'showVote',
@@ -55,6 +55,14 @@ const ACTION_REGISTRY = {
     config: ['getVoter.showVoteUuid', 'getVoter.userRef'],
     optional: [],
     summary: 'Get voter balance and fraud status',
+  },
+  addVote: {
+    group: 'voter',
+    http: 'POST /show-vote/{uuid}/voter/{userRef}/add-vote',
+    client: 'client.voters.addVote(showVoteUuid, userRef, body)',
+    config: ['addVote.showVoteUuid', 'addVote.userRef', 'addVote.additionalVoteType', 'addVote.nbPoints', 'addVote.uniqueTransactionId'],
+    optional: [],
+    summary: 'Credit additional points to a voter (PURCHASE, SPONSOR, VIDEO, GAME, REFERAL, PROMO)',
   },
   castVote: {
     group: 'voter',
@@ -97,7 +105,7 @@ function findSimilarActions(name) {
 function printHelpSummary() {
   console.log('DV Live web show engine — reference runner\n');
   console.log('Usage:');
-  console.log('  npm run <action>          run one API call using config.json');
+  console.log('  npm run <action>          run one action using config.json');
   console.log('  npm run help              this summary');
   console.log('  npm run help -- <action>  detail for one action\n');
 
@@ -128,7 +136,7 @@ function printHelpDetail(name) {
   console.log(`Client:  ${entry.client}`);
   console.log('\nRequired config:');
   if (entry.config.length === 0) {
-    console.log('  (none beyond baseUrl and bearerToken)');
+    console.log('  (none beyond DVLIVE_MODE, DVLIVE_ENV and DVLIVE_API_TOKEN_<environment> and optional PROD ALB token)');
   } else {
     for (const key of entry.config) console.log(`  ${key}`);
   }
@@ -184,8 +192,18 @@ function loadConfig() {
   } catch (err) {
     throw new Error(`config.json is not valid JSON: ${err.message}`);
   }
-  if (!cfg.baseUrl || typeof cfg.baseUrl !== 'string') {
-    throw new Error('config.baseUrl must be a non-empty string');
+  cfg.DVLIVE_MODE = (process.env.DVLIVE_MODE ?? cfg.DVLIVE_MODE ?? 'PROD').trim();
+  if (!['INT', 'PROD'].includes(cfg.DVLIVE_MODE)) {
+    throw new Error('config.DVLIVE_MODE must be INT or PROD');
+  }
+  cfg.DVLIVE_ENV = (process.env.DVLIVE_ENV ?? cfg.DVLIVE_ENV)?.trim();
+  if (!['DEV', 'STAG', 'PROD'].includes(cfg.DVLIVE_ENV)) {
+    throw new Error('config.DVLIVE_ENV must be DEV, STAG or PROD');
+  }
+  const apiTokenKey = `DVLIVE_API_TOKEN_${cfg.DVLIVE_ENV}`;
+  cfg.apiToken = (process.env[apiTokenKey] ?? cfg[apiTokenKey])?.trim();
+  if (!cfg.apiToken) {
+    throw new Error(`config.${apiTokenKey} is required`);
   }
   return cfg;
 }
@@ -250,10 +268,10 @@ function printNbVoteRemaining(res) {
 }
 
 async function runGetShowVoteChoice(client, cfg) {
-  require_(cfg.showVoteChoice, ['uuid'], 'showVoteChoice');
-  const { uuid } = cfg.showVoteChoice;
-  printHeader('showVoteChoices.get', { uuid });
-  const res = await client.showVoteChoices.get(uuid);
+  require_(cfg.showVoteChoice, ['uuid', 'userRef'], 'showVoteChoice');
+  const { uuid, userRef } = cfg.showVoteChoice;
+  printHeader('showVoteChoices.get', { uuid, userRef });
+  const res = await client.showVoteChoices.get(uuid, userRef);
   console.log(JSON.stringify(res, null, 2));
   printPayloadTable(
     [
@@ -263,9 +281,12 @@ async function runGetShowVoteChoice(client, cfg) {
         lastname: res?.lastname,
         status: res?.status,
         order: res?.order,
+        balance: res?.balance,
+        remainingPoints: res?.remainingPoints,
+        round: res?.round,
       },
     ],
-    ['uuid', 'firstname', 'lastname', 'status', 'order'],
+    ['uuid', 'firstname', 'lastname', 'status', 'order', 'balance', 'remainingPoints', 'round'],
   );
   return res;
 }
@@ -306,6 +327,26 @@ async function runGetVoter(client, cfg) {
   if (res?.remainingPoints != null) {
     console.log(`\nRemaining points: ${res.remainingPoints}`);
   }
+  return res;
+}
+
+async function runAddVote(client, cfg) {
+  require_(cfg.addVote, ['showVoteUuid', 'userRef', 'additionalVoteType', 'nbPoints', 'uniqueTransactionId'], 'addVote');
+  const { showVoteUuid, userRef, additionalVoteType, nbPoints, uniqueTransactionId } = cfg.addVote;
+  if (typeof uniqueTransactionId !== 'string' || !uniqueTransactionId.trim()) {
+    throw new Error('config.addVote.uniqueTransactionId must be a nonblank string');
+  }
+  if (!['PURCHASE', 'SPONSOR', 'VIDEO', 'GAME', 'REFERAL', 'PROMO'].includes(additionalVoteType)) {
+    throw new Error('config.addVote.additionalVoteType must be PURCHASE, SPONSOR, VIDEO, GAME, REFERAL or PROMO');
+  }
+  if (!Number.isInteger(nbPoints) || nbPoints <= 0) {
+    throw new Error('config.addVote.nbPoints must be a positive integer');
+  }
+  const body = voterRequestBody(cfg.addVote);
+  printHeader('voters.addVote', { showVoteUuid, userRef, body });
+  const res = await client.voters.addVote(showVoteUuid, userRef, body);
+  console.log(JSON.stringify(res, null, 2));
+  printNbVoteRemaining(res);
   return res;
 }
 
@@ -359,7 +400,7 @@ function reportError(err) {
       console.error(`  body       : ${bodyStr}`);
     }
     if (err instanceof DvliveAuthError) {
-      console.error('  → Check bearerToken in config.json.');
+      console.error('  → Check DVLIVE_API_TOKEN_<environment>, DVLIVE_MODE and, in PROD mode, DVLIVE_ALB_TOKEN_<environment> in config.json or the environment.');
     }
     if (
       err instanceof DvliveConflictError &&
@@ -386,18 +427,20 @@ async function main() {
   const cfg = loadConfig();
   const action = resolveAction(cfg);
 
+  const tokenKey = `DVLIVE_ALB_TOKEN_${cfg.DVLIVE_ENV}`;
+  const albToken = cfg.DVLIVE_MODE === 'INT'
+    ? undefined
+    : (process.env[tokenKey] ?? cfg[tokenKey])?.trim() || undefined;
+  const client = new DvliveClient({ environment: cfg.DVLIVE_ENV, mode: cfg.DVLIVE_MODE, apiToken: cfg.apiToken, albToken });
+
   console.log('DV Live web show engine — reference runner');
-  console.log(`  baseUrl : ${cfg.baseUrl}`);
+  console.log(`  mode    : ${cfg.DVLIVE_MODE}`);
+  console.log(`  baseUrl : ${client.baseUrl}`);
   console.log(
-    `  auth    : ${cfg.bearerToken ? 'Bearer (token set)' : '(none — likely 401)'}`,
+    `  auth    : Bearer (token set)${albToken ? ' + X-Internal-Auth (token set)' : ''}`,
   );
   console.log(`  action  : ${action}`);
   console.log('');
-
-  const client = new DvliveClient({
-    baseUrl: cfg.baseUrl,
-    bearerToken: cfg.bearerToken,
-  });
 
   switch (action) {
     case 'getShowVoteChoice':
@@ -411,6 +454,9 @@ async function main() {
       break;
     case 'getVoter':
       await runGetVoter(client, cfg);
+      break;
+    case 'addVote':
+      await runAddVote(client, cfg);
       break;
     case 'castVote':
       await runCastVote(client, cfg);

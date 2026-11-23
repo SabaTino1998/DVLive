@@ -25,14 +25,14 @@ Usare una chiave Supabase anon o publishable, mai `sb_secret_` o service-role.
 Le variabili `EXPO_PUBLIC_` sono incluse nell’app, compreso App Secret SmartUser,
 come nella configurazione client di Bravigo. Usare credenziali dedicate a questo ambiente.
 Il token DV Live è configurato esclusivamente nel backend come secret
-`DVLIVE_API_TOKEN`; non impostare `DVLIVE_BEARER_TOKEN` o
+`DVLIVE_ALB_TOKEN_DEV`, `DVLIVE_ALB_TOKEN_STAG`, `DVLIVE_ALB_TOKEN_PROD` (selected by `DVLIVE_ENV`); non impostare `DVLIVE_BEARER_TOKEN` o
 `EXPO_PUBLIC_DVLIVE_BEARER_TOKEN` nell’app.
 
 Il client richiede la Edge Function `dvlive` con il nuovo contratto
 `{ ok, data }` / `{ ok: false, error }`. Impostare `SUPABASE_URL` su quel backend.
 La funzione e gli smoke script di questo repository implementano lo stesso contratto.
 
-Per avviare il backend locale, configurare `DVLIVE_API_TOKEN` in `supabase/.env`
+Per avviare il backend locale, configurare `DVLIVE_ALB_TOKEN_DEV`, `DVLIVE_ALB_TOKEN_STAG`, `DVLIVE_ALB_TOKEN_PROD` (selected by `DVLIVE_ENV`) in `supabase/.env`
 e dalla root del repository eseguire:
 
 ```bash
@@ -56,7 +56,8 @@ compatibile se la versione installata di Expo Go supporta solo SDK più recenti.
   Come Bravigo, il signup fornisce già il token: non viene eseguito un secondo login.
 - Login: `loginWithEmail → syncSupabaseSession → getVoter` e `getShowVote`.
 - Dettaglio: Expo Router apre `/choices/[uuid]` ed esegue `getShowVoteChoice`.
-- `PRESENT` viene visualizzato come **PRESENT**, `EVICTED` come **EVICTED**.
+- Con `isNominated=true` viene mostrato solo **NOMINATED**; altrimenti viene mostrato lo status (`PRESENT`, `EVICTED`).
+  Nel dettaglio, `isNominated` proviene dalla risposta di `getShowVoteChoice`.
 
 Tutte le chiamate DV Live passano direttamente dalla Edge Function Supabase.
 `resolveUser.ts` e `supabase.ts` sono quelli originali di Bravigo: `syncUser`

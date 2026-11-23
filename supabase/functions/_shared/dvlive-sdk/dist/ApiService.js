@@ -17,7 +17,7 @@ export class ApiService {
     timeoutMs;
     logger;
     constructor(config) {
-        this.url = resolveBaseUrl(config.environment);
+        this.url = resolveBaseUrl(config.environment, config.mode);
         this.logger = new DvLiveLogger(config.logEnable, config.logLevel);
         this.extraHeaders = config.headers;
         this.timeoutMs = config.timeoutMs ?? 15000;
@@ -92,14 +92,17 @@ export class ApiService {
     }
     async request(operation, method, path, body) {
         const extra = typeof this.extraHeaders === "function" ? this.extraHeaders() : this.extraHeaders;
-        const headers = new Headers({ Accept: "application/json", ...(body === undefined ? {} : { "Content-Type": "application/json" }) });
+        const headers = new Headers({
+            Accept: "application/json",
+            ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+        });
         new Headers(extra).forEach((value, key) => headers.set(key, value));
         const requestBody = body === undefined ? undefined : JSON.stringify(body);
         const signal = AbortSignal.timeout(this.timeoutMs);
         const started = Date.now();
         const secrets = [];
         headers.forEach((value, key) => {
-            if (/authorization|token|key/i.test(key))
+            if (/authorization|token|key|x-internal-auth/i.test(key))
                 secrets.push(value, value.replace(/^Bearer\s+/i, ""));
         });
         const voterRef = path.match(/\/voter\/([^/]+)/)?.[1];

@@ -41,8 +41,11 @@ See [runner/README.md](runner/README.md) for all available actions.
 Endpoint: `https://<project-ref>.supabase.co/functions/v1/dvlive`.
 Supabase JWT verification depends on `verify_jwt` in `supabase/config.toml`
 (currently `false`). Smoke tests still send the Supabase headers.
-Set `DVLIVE_API_TOKEN` in `supabase/.env` or Supabase secrets, without a
-`Bearer` prefix. The function attaches it to upstream requests. Clients send
+Set `DVLIVE_ALB_TOKEN_DEV`, `DVLIVE_ALB_TOKEN_STAG`, `DVLIVE_ALB_TOKEN_PROD` (selected by `DVLIVE_ENV`) in `supabase/.env` or Supabase secrets. The function attaches the selected token
+as `X-Internal-Auth` to upstream requests in `DVLIVE_MODE=PROD` (default).
+`DVLIVE_API_TOKEN_<environment>` (DEV, STAG or PROD, selected by `DVLIVE_ENV`) is required in both modes and is always sent as `Authorization: Bearer <selected-api-token>`.
+With `DVLIVE_MODE=INT`, requests use the corresponding `int-` host and only
+`Authorization: Bearer <selected-api-token>`; ALB tokens are ignored. Clients send
 `apikey` and `Authorization: Bearer <app access_token>` for all five commands;
 never send `bearer-token`. The catalog requires no JWT or server configuration.
 
@@ -57,10 +60,13 @@ the original HTTP status. Errors use `{ "ok": false, "error": { "message", "code
 | mode | Method | Query parameters besides `mode` | JSON body | Response |
 | --- | --- | --- | --- | --- |
 | `getShowVoteChoice` | GET | `uuid` | — | Participant, status, images, rounds |
-| `getShowVote` | GET | `uuid` | — | Show, dates, and current round with participants |
+| `getShowVote` | GET | `uuid` | — | Show name, timezone, dates, and current round with participants |
 | `getVoter` | GET | `showVoteUuid` | — | Voter, balance, fraud status |
 | `createVoter` | POST | `showVoteUuid` | Optional `email`, `phone` | Registration result |
 | `castVote` | POST | `showVoteUuid` | Required `votes`, optional fraud prevention fields | Voting result and remaining votes, when provided |
+
+`getShowVote` returns the show's IANA time zone identifier in `data.timezone`
+(for example, `Europe/Paris`).
 
 `votes` is a non-empty array of `{ "choiceUuid": "...", "nbVotes": 1 }`.
 The fraud prevention fields are `sessionToken`, `phoneFingerPrint`, `ip`, `userAgent`,
@@ -128,11 +134,14 @@ the local DVLive bootstrap migration to an existing Bravigo database.
 
 ### Local environment and deployment
 
-`supabase/.env` contains `DVLIVE_ENV`, set to `STAG` or `PROD`:
+`supabase/.env` contains `DVLIVE_ENV`, set to `DEV`, `STAG` or `PROD`:
 
 ```dotenv
+DVLIVE_MODE=PROD
+DVLIVE_API_TOKEN_DEV=
+DVLIVE_API_TOKEN_STAG=<stag-api-token>
+DVLIVE_API_TOKEN_PROD=
 DVLIVE_ENV=STAG
-DVLIVE_API_TOKEN=<server-only-dvlive-api-token>
 ```
 
 Optional SDK logging is configured in the same `supabase/.env` file:
@@ -148,10 +157,15 @@ these settings to the SDK; output appears in the Supabase function terminal/logs
 See [SDK logging](supabase/functions/_shared/dvlive-sdk/README.md#logging) for details. The local template keeps
 logging disabled until explicitly enabled.
 
-The SDK selects the base URL according to the environment: `STAG` uses
-`https://dev-webshow-engine.dv-live.com`, while `PROD` uses
-`https://webshow-engine.dv-live.com`. The mapping is internal to the SDK. A missing value or a value other than
-`STAG` or `PROD` results in an HTTP 500 configuration error for operation requests.
+The SDK selects the base URL according to the environment: `DEV` uses
+`https://dev-webshow-engine.dv-live.com`, `STAG` uses
+`https://stag-webshow-engine.dv-live.com`, and `PROD` uses
+`https://webshow-engine.dv-live.com`. `DVLIVE_MODE=INT` selects `https://int-dev-webshow-engine.dv-live.com`,
+`https://int-stag-webshow-engine.dv-live.com`, or `https://int-webshow-engine.dv-live.com`
+respectively. `DVLIVE_MODE` accepts only `INT` or `PROD`, defaults to `PROD`
+when absent, and is independent of `DVLIVE_ENV`. Invalid mode returns HTTP 500.
+The mapping is internal to the SDK. A missing environment value or a value other than
+`DEV`, `STAG` or `PROD` results in an HTTP 500 configuration error for operation requests.
 The catalog remains available without configuration.
 The file is ignored by Git; on a fresh checkout, copy it from `supabase/.env.example`.
 
@@ -184,7 +198,10 @@ import { ApiService } from "@digitalvirgo/dvlive-api";
 
 const api = new ApiService({
   environment: "STAG", // The Edge Function reads this value from DVLIVE_ENV.
-  headers: () => ({ Authorization: `Bearer ${token}` }),
+  headers: {
+    Authorization: `Bearer ${apiToken}`,
+    ...(token ? { "X-Internal-Auth": token } : {}),
+  },
 });
 const result = await api.getShowVote(uuid);
 // result.data: ShowVote; result.status: number; result.headers: Headers
@@ -221,8 +238,9 @@ No `export` is needed. For remote Supabase, set `SUPABASE_URL` and
 `SUPABASE_ANON_KEY` and SmartUser login configuration in `script/config.json`.
 Locally, the default URL is `http://127.0.0.1:54321`; the key is resolved
 as in `atom`: from the environment, then `supabase status -o json`, then the local demo key.
-The DV Live token belongs in the server secret `DVLIVE_API_TOKEN`.
-`DVLIVE_BEARER_TOKEN` in script config is used only by direct add-vote.
+The DV Live bearer token belongs in the server secret `DVLIVE_API_TOKEN_<environment>`.
+Optional PROD ALB secrets are `DVLIVE_ALB_TOKEN_DEV`, `DVLIVE_ALB_TOKEN_STAG`, `DVLIVE_ALB_TOKEN_PROD` (selected by `DVLIVE_ENV`).
+`DVLIVE_API_TOKEN_DEV`, `DVLIVE_API_TOKEN_STAG` and `DVLIVE_API_TOKEN_PROD` in script config are used only by direct add-vote.
 
 Details, POST scripts, and available variables: [script/README.md](script/README.md).
 SDK tests use mocked HTTP responses and run separately from the live smoke tests:
@@ -232,6 +250,7 @@ npm ci --prefix supabase/functions/_shared/dvlive-sdk
 npm --prefix supabase/functions/_shared/dvlive-sdk test
 ```
 
-Vote crediting is available only through `bash script/smoke-add-vote.sh`, which uses
-local DV Live environment/bearer configuration and calls the upstream API directly with curl.
-It is not exposed by the SDK, Edge Function, or reference runner.
+Vote crediting is available through `npm run addVote` in `runner/` (see
+[runner configuration](runner/README.md)), or `bash script/smoke-add-vote.sh`,
+which calls the upstream API directly with curl.
+It is not exposed by the SDK or Edge Function.

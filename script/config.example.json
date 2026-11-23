@@ -5,8 +5,11 @@
   "EXPO_PUBLIC_SERVICE_SLUG": "dvlive",
   "SMART_USER_USERNAME": "<test-user-email>",
   "SMART_USER_PASSWORD": "<test-user-password>",
-  "DVLIVE_BEARER_TOKEN": "<dvlive-bearer-token>",
+  "DVLIVE_API_TOKEN_DEV": "",
+  "DVLIVE_API_TOKEN_STAG": "<stag-api-token>",
+  "DVLIVE_API_TOKEN_PROD": "",
   "SHOW_VOTE_UUID": "11111111-1111-4111-8111-111111111101",
   "SUPABASE_URL": "http://127.0.0.1:54321",
-  "SUPABASE_ANON_KEY": ""
+  "SUPABASE_ANON_KEY": "",
+  "DVLIVE_ENV": "STAG"
 }

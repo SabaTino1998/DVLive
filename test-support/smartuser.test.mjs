@@ -96,3 +96,10 @@ test('smoke session exchanges N for the same syncUser JWT used by the frontend',
   });
   assert.deepEqual(result, data);
 });
+
+test('session rejects missing public configuration and secret keys before login', async () => {
+  const load = () => assert.fail('SDK must not load for invalid Supabase configuration');
+  const send = () => assert.fail('Invalid configuration must not make network requests');
+  await assert.rejects(getSmartUserAppSession({ ...config, supabaseUrl: 'http://edge.test' }, load, send), /SUPABASE_URL and SUPABASE_ANON_KEY/);
+  await assert.rejects(getSmartUserAppSession({ ...config, supabaseUrl: 'http://edge.test', supabaseKey: 'sb_secret_test' }, load, send), /secret key.*public anon or publishable key/);
+});

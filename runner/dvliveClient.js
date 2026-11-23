@@ -2,7 +2,7 @@
  * Minimal DV Live web show engine API client.
  *
  * OpenAPI: openapi.json (DVLive web show engine — votes, participants).
- * Authentication: HTTP Bearer (Authorization: Bearer <token>).
+ * Authentication: Bearer apiToken in both modes; PROD optional X-Internal-Auth.
  */
 
 class DvliveError extends Error {
@@ -64,18 +64,51 @@ class DvliveValidationError extends DvliveError {
   }
 }
 
+const BASE_URLS = Object.freeze({
+  DEV: 'https://dev-webshow-engine.dv-live.com',
+  STAG: 'https://stag-webshow-engine.dv-live.com',
+  PROD: 'https://webshow-engine.dv-live.com',
+});
+
+const INTERNAL_BASE_URLS = Object.freeze({
+  DEV: 'https://int-dev-webshow-engine.dv-live.com',
+  STAG: 'https://int-stag-webshow-engine.dv-live.com',
+  PROD: 'https://int-webshow-engine.dv-live.com',
+});
+
 class DvliveClient {
-  constructor({ baseUrl, bearerToken } = {}) {
-    if (!baseUrl || typeof baseUrl !== 'string') {
-      throw new Error('DvliveClient: baseUrl is required');
+  constructor({ environment, mode = 'PROD', apiToken, albToken } = {}) {
+    if (mode !== 'INT' && mode !== 'PROD') {
+      throw new Error('DvliveClient: mode must be INT or PROD');
     }
-    this.baseUrl = baseUrl.replace(/\/+$/, '');
-    this.bearerToken = bearerToken || '';
+    if (!Object.hasOwn(BASE_URLS, environment)) {
+      throw new Error('DvliveClient: environment must be DEV, STAG or PROD');
+    }
+    if (typeof apiToken !== 'string' || !apiToken.trim()) {
+      throw new Error('DvliveClient: DVLIVE_API_TOKEN is required');
+    }
+    this.apiToken = apiToken.trim();
+    this.mode = mode;
+    this.baseUrl = (mode === 'INT' ? INTERNAL_BASE_URLS : BASE_URLS)[environment];
+    this.albToken = mode === 'INT' ? undefined : albToken?.trim() || undefined;
 
     this.showVoteChoices = {
-      get: (uuid) => {
+      get: async (uuid, userRef) => {
         if (!uuid) throw new Error('showVoteChoices.get: uuid is required');
-        return this.request('GET', `/show-vote-choice/${encodeURIComponent(uuid)}`);
+        if (typeof userRef !== 'string' || !userRef.trim()) {
+          throw new Error('showVoteChoices.get: userRef is required');
+        }
+        const choice = await this.request('GET', `/show-vote-choice/${encodeURIComponent(uuid)}`);
+        const [voter, show] = await Promise.all([
+          this.voters.get(choice.showVoteUuid, userRef.trim()),
+          this.showVotes.get(choice.showVoteUuid),
+        ]);
+        return {
+          ...choice,
+          balance: voter.balance,
+          remainingPoints: voter.remainingPoints,
+          round: show.round ? { startDay: show.round.startDay, endDay: show.round.endDay } : null,
+        };
       },
     };
 
@@ -105,6 +138,16 @@ class DvliveClient {
         );
       },
 
+      addVote: (showVoteUuid, userRef, body) => {
+        if (!showVoteUuid) throw new Error('voters.addVote: showVoteUuid is required');
+        if (!userRef) throw new Error('voters.addVote: userRef is required');
+        return this.request(
+          'POST',
+          `/show-vote/${encodeURIComponent(showVoteUuid)}/voter/${encodeURIComponent(userRef)}/add-vote`,
+          { body: body ?? {} },
+        );
+      },
+
       castVote: (showVoteUuid, uniqRef, body) => {
         if (!showVoteUuid) throw new Error('voters.castVote: showVoteUuid is required');
         if (!uniqRef) throw new Error('voters.castVote: uniqRef is required');
@@ -126,13 +169,16 @@ class DvliveClient {
       }
     }
 
+    const extraHeaders = Object.fromEntries(
+      Object.entries(headers ?? {}).filter(([name]) =>
+        !['authorization', 'x-internal-auth'].includes(name.toLowerCase())),
+    );
     const reqHeaders = {
+      ...extraHeaders,
       Accept: 'application/json',
-      ...(this.bearerToken
-        ? { Authorization: `Bearer ${this.bearerToken}` }
-        : {}),
+      Authorization: `Bearer ${this.apiToken}`,
+      ...(this.albToken ? { 'X-Internal-Auth': this.albToken } : {}),
       ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
-      ...headers,
     };
 
     const urlStr = url.toString();

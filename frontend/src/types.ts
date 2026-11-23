@@ -9,7 +9,7 @@ export interface ChoiceDetail extends Choice {
   reintroducedRound?: { uuid: string; round: number } | null;
 }
 export interface Show {
-  name: string; startDate: string; endDate: string;
+  name: string; timezone: string; startDate: string; endDate: string;
   round?: { currentRound: number; name: string; startDay: string; endDay: string; choices: Choice[] } | null;
 }
 export interface Voter {

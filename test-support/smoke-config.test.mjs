@@ -16,7 +16,7 @@ function fixture(t) {
     EXPO_PUBLIC_SMARTUSER_APP_ID: 'test.bolt.app',
     EXPO_PUBLIC_SMARTUSER_SECRET: "special'\"$()<>|\\secret\n",
     EXPO_PUBLIC_SMARTUSER_ENV: 'STAG', SMART_USER_USERNAME: 'test@example.test',
-    SMART_USER_PASSWORD: '123456', DVLIVE_BEARER_TOKEN: 'test-bearer', SHOW_VOTE_UUID: 'json-show/a',
+    SMART_USER_PASSWORD: '123456', DVLIVE_ENV: 'STAG', DVLIVE_API_TOKEN_DEV: 'dev-bearer', DVLIVE_API_TOKEN_STAG: ' test-bearer ', DVLIVE_API_TOKEN_PROD: 'prod-bearer', SHOW_VOTE_UUID: 'json-show/a',
     SUPABASE_URL: 'http://supabase.test', SUPABASE_ANON_KEY: 'test-key',
   };
   const config = join(directory, 'config.json');
@@ -50,6 +50,8 @@ a=sys.argv[1:]
 open(os.environ['CAPTURE'],'w').write(json.dumps(a))
 post='POST' in a
 data={'status':'success','code':201,'message':'Recorded'} if post else {'ok':True,'data':{'name':'Show','startDate':'start','endDate':'end','round':None}}
+if not post and os.environ.get('MOCK_WITHOUT_TIMEZONE') != '1':
+    data['data']['timezone']='Europe/Paris'
 open(a[a.index('--output')+1],'w').write(json.dumps(data))
 print('201' if post else '200',end='')
 `, { mode: 0o755 });
@@ -66,8 +68,14 @@ print('201' if post else '200',end='')
       assert.ok(args.includes('Authorization: Bearer test-app-jwt'));
       assert.ok(args.includes('apikey: test-key'));
       assert.equal(new URL(args.at(-1)).searchParams.get('uuid'), f.settings.SHOW_VOTE_UUID);
+      assert.match(result.stdout, /"timezone": "Europe\/Paris"/);
     }
   }
+  const missingTimezone = spawnSync('bash', ['smoke-get-show-vote.sh'], {
+    cwd: join(root, 'script'), env: { ...f.environment, MOCK_WITHOUT_TIMEZONE: '1' }, encoding: 'utf8',
+  });
+  assert.equal(missingTimezone.status, 1);
+  assert.match(missingTimezone.stderr, /expected a nonempty show timezone/);
 });
 test('loader rejects invalid JSON and ignores unknown shell variable names', t => {
   const f = fixture(t);
@@ -79,4 +87,70 @@ test('loader rejects invalid JSON and ignores unknown shell variable names', t =
   result = spawnSync('bash', ['-c', 'source script/smoke-config.sh; printf "%s" "$HOME"'], { cwd: root, env: f.environment, encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr);
   assert.notEqual(result.stdout, '/should-not-change');
+});
+
+test('direct add-vote selects only the matching environment token and rejects missing or blank values', t => {
+  const f = fixture(t);
+  writeFileSync(join(f.directory, 'curl'), `#!/usr/bin/env python3
+import sys,json,os
+a=sys.argv[1:]
+open(os.environ['CAPTURE'],'w').write(json.dumps(a))
+open(a[a.index('--output')+1],'w').write(json.dumps({'status':'success','code':201,'message':'Recorded'}))
+print('201',end='')
+`, { mode: 0o755 });
+  for (const [environment, host] of [['DEV', 'dev-webshow-engine.dv-live.com'], ['STAG', 'stag-webshow-engine.dv-live.com'], ['PROD', 'webshow-engine.dv-live.com']]) {
+    const key = `DVLIVE_API_TOKEN_${environment}`;
+    for (const token of [' selected-token ', undefined, '', ' \n\t ']) {
+      writeFileSync(f.config, JSON.stringify({ ...f.settings, DVLIVE_ENV: environment, DVLIVE_API_TOKEN: 'legacy-token', DVLIVE_BEARER_TOKEN: 'old-bearer', [key]: token }));
+      // Empty the capture so failure cases also prove curl was not invoked.
+      writeFileSync(f.environment.CAPTURE, '');
+      const result = spawnSync('bash', ['script/smoke-add-vote.sh'], { cwd: root, env: { ...f.environment, USER_REF: 'absolute-user' }, encoding: 'utf8' });
+      assert.equal(result.status, token?.trim() ? 0 : 1, result.stderr);
+      if (token?.trim()) {
+        const args = JSON.parse(readFileSync(f.environment.CAPTURE, 'utf8'));
+        assert.ok(args.includes('Authorization: Bearer selected-token'));
+        assert.equal(new URL(args.at(-1)).hostname, host);
+      } else {
+        assert.ok(result.stderr.includes(key));
+        assert.equal(readFileSync(f.environment.CAPTURE, 'utf8'), '');
+      }
+    }
+  }
+});
+
+test('candidate smoke requires enriched balance, points and nullable round dates using app JWT', t => {
+  const f = fixture(t);
+  writeFileSync(join(f.directory, 'curl'), `#!/usr/bin/env python3
+import sys,json,os
+a=sys.argv[1:]
+open(os.environ['CAPTURE'],'w').write(json.dumps(a))
+open(a[a.index('--output')+1],'w').write(os.environ['MOCK_RESPONSE'])
+print('200',end='')
+`, { mode: 0o755 });
+  const choice = { uuid: 'choice', showVoteUuid: 'show', firstname: 'First', lastname: 'Last', status: 'ACTIVE', order: 1 };
+  const enriched = { ...choice, balance: { standardPoint: 0 }, remainingPoints: 0, round: null };
+  const missing = key => Object.fromEntries(Object.entries(enriched).filter(([name]) => name !== key));
+  for (const [data, valid] of [
+    [enriched, true],
+    [{ ...enriched, round: { startDay: '2026-11-01', endDay: '2026-11-30' } }, true],
+    [choice, false],
+    [missing('round'), false],
+    [missing('balance'), false],
+    [missing('remainingPoints'), false],
+    [{ ...enriched, balance: null }, false],
+    [{ ...enriched, remainingPoints: '0' }, false],
+    [{ ...enriched, round: {} }, false],
+    [{ ...enriched, round: { startDay: 'start', endDay: null } }, false],
+  ]) {
+    const result = spawnSync('bash', ['script/smoke-get-show-vote-choice.sh'], {
+      cwd: root, encoding: 'utf8',
+      env: { ...f.environment, APP_JWT: 'app-jwt', CHOICE_UUID: 'choice/id', MOCK_RESPONSE: JSON.stringify({ ok: true, data }) },
+    });
+    assert.equal(result.status, valid ? 0 : 1, result.stderr);
+    const args = JSON.parse(readFileSync(f.environment.CAPTURE, 'utf8'));
+    assert.ok(args.includes('Authorization: Bearer app-jwt'));
+    const url = new URL(args.at(-1));
+    assert.equal(url.searchParams.get('uuid'), 'choice/id');
+    assert.equal(url.searchParams.has('userRef'), false);
+  }
 });
